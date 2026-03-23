@@ -617,19 +617,34 @@ document.getElementById('gpsModalRetry').addEventListener('click', () => {
 });
 gpsModal.addEventListener('click', e => { if (e.target === gpsModal) gpsModal.style.display = 'none'; });
 
-function requestGps() {
+async function requestGps() {
   if (!navigator.geolocation) {
     setStatus('GPS non disponible sur ce navigateur.', 'error');
     setGpsState('unavailable');
     return;
   }
 
+  // Vérifie l'état de la permission si l'API est dispo (pas sur Safari iOS < 16)
+  if (navigator.permissions) {
+    try {
+      const perm = await navigator.permissions.query({ name: 'geolocation' });
+      if (perm.state === 'denied') {
+        setGpsState('denied');
+        setStatus('Localisation bloquée — voir les instructions', 'error');
+        showGpsModal();
+        return;
+      }
+      // Écoute les changements futurs
+      perm.onchange = () => {
+        if (perm.state === 'granted') setGpsState('idle');
+        else if (perm.state === 'denied') setGpsState('denied');
+      };
+    } catch {}
+  }
+
   setGpsState('loading');
   setStatus('Localisation GPS en cours…', 'loading');
 
-  // ⚠️ IMPORTANT : getCurrentPosition() doit être appelé DIRECTEMENT
-  // dans le handler de click, sans aucun await avant lui.
-  // Sinon le navigateur mobile refuse d'afficher la popup d'autorisation.
   navigator.geolocation.getCurrentPosition(
     async pos => {
       userLat = pos.coords.latitude;
@@ -653,11 +668,11 @@ function requestGps() {
       fetchStations();
     },
     err => {
-      // code 1 = PERMISSION_DENIED, code 2 = POSITION_UNAVAILABLE, code 3 = TIMEOUT
+      // PERMISSION_DENIED = 1, POSITION_UNAVAILABLE = 2, TIMEOUT = 3
       if (err.code === 1) {
         setGpsState('denied');
         setStatus('Localisation refusée', 'error');
-        showGpsModal(); // affiche les instructions pour débloquer
+        showGpsModal();
       } else if (err.code === 2) {
         setGpsState('idle');
         setStatus('Position indisponible — vérifiez que le GPS est activé', 'error');
@@ -673,8 +688,7 @@ function requestGps() {
 
 btnGps.addEventListener('click', requestGps);
 
-// Vérifie silencieusement la permission au chargement
-// (SANS bloquer le flux — uniquement pour teinter le bouton)
+// Vérifie la permission GPS au chargement (silencieusement)
 (async () => {
   if (navigator.permissions) {
     try {
