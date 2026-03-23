@@ -3,198 +3,173 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>CarbuFuel V4 🚀</title>
+<title>CarbuFuel Pro 🚀</title>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#0a0c0f">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icon-192.png">
 
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;700;900&family=Barlow:wght@400;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Barlow:wght@400;600&display=swap');
 
   :root {
-    --orange: #f0a500; --red: #e05c2a; --green: #3fb950;
-    --danger: #f85149; --bg: #0a0c0f; --card: #111318; --border: #1e2229;
+    --primary: #f0a500; --accent: #e05c2a; --success: #3fb950;
+    --bg: #0a0c0f; --card: #161a21; --border: #21262d; --text-dim: #8b949e;
   }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: #fff; font-family: 'Barlow', sans-serif; padding: 20px 15px; max-width: 500px; margin: 0 auto; }
+
+  header { margin-bottom: 25px; text-align: center; }
+  h1 { font-family: 'Barlow Condensed', sans-serif; font-size: 2.5rem; font-weight: 900; letter-spacing: -1px; background: linear-gradient(to right, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
   
-  body {
-    background: var(--bg); color: #fff; font-family: 'Barlow', sans-serif;
-    padding: env(safe-area-inset-top) 16px 40px; max-width: 500px; margin: 0 auto;
-  }
+  .search-area { background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 20px; }
+  .input-group { display: flex; gap: 8px; margin-bottom: 12px; }
+  input, select { flex: 1; padding: 14px; background: #0d1117; border: 1px solid var(--border); border-radius: 12px; color: #fff; font-size: 1rem; outline: none; transition: 0.3s; }
+  input:focus { border-color: var(--primary); }
 
-  h1 {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 2.2rem; font-weight: 900;
-    background: linear-gradient(135deg, var(--orange), var(--red));
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    margin-top: 20px;
-  }
+  button { padding: 14px; border-radius: 12px; border: none; cursor: pointer; font-weight: 700; font-family: 'Barlow Condensed', sans-serif; transition: 0.2s; }
+  .btn-main { background: var(--primary); color: #000; width: 100%; font-size: 1.2rem; text-transform: uppercase; }
+  .btn-icon { background: #21262d; color: #fff; width: 55px; font-size: 1.2rem; }
 
-  .subtitle { color: #666; font-size: 0.9rem; margin-bottom: 25px; }
+  .station-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 20px; margin-bottom: 12px; animation: fadeIn 0.4s ease-out both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-  .search-box { display: flex; gap: 8px; margin-bottom: 12px; }
-  input, select {
-    flex: 1; padding: 14px; background: var(--card); border: 1px solid var(--border);
-    border-radius: 12px; color: #fff; font-size: 1rem; outline: none;
-  }
-
-  button {
-    padding: 14px; border-radius: 12px; border: none; cursor: pointer;
-    font-weight: 700; font-family: 'Barlow Condensed', sans-serif; transition: 0.2s;
-  }
-
-  .btn-primary { background: linear-gradient(135deg, var(--orange), var(--red)); color: #000; width: 100%; font-size: 1.1rem; margin-top: 10px; }
-  .btn-ghost { background: var(--card); color: #fff; border: 1px solid var(--border); width: 50px; }
-
-  .card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
-    padding: 20px; margin-top: 15px; animation: slideIn 0.3s ease-out;
-  }
-
-  @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-  .station-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-  .price-tag { font-family: 'Barlow Condensed', sans-serif; font-size: 2.2rem; font-weight: 900; color: var(--green); }
-  .dist-tag { color: #666; font-size: 0.85rem; }
+  .flex-row { display: flex; justify-content: space-between; align-items: flex-start; }
+  .price { font-family: 'Barlow Condensed', sans-serif; font-size: 2.4rem; font-weight: 900; color: var(--success); line-height: 1; }
+  .brand { font-weight: 700; font-size: 1.1rem; text-transform: uppercase; margin-bottom: 4px; color: var(--primary); }
+  .meta { color: var(--text-dim); font-size: 0.85rem; line-height: 1.4; }
   
-  .maps-btn {
-    display: block; text-align: center; text-decoration: none; background: #fff; 
-    color: #000; padding: 10px; border-radius: 8px; font-weight: 700; font-size: 0.9rem;
-  }
-
-  .error { color: var(--danger); text-align: center; padding: 20px; font-weight: 600; }
-  .loading { text-align: center; padding: 40px; color: var(--orange); font-weight: 700; letter-spacing: 2px; }
+  .update-tag { display: inline-block; padding: 4px 8px; background: rgba(63, 185, 80, 0.1); color: var(--success); border-radius: 6px; font-size: 0.75rem; font-weight: 600; margin-top: 8px; }
+  
+  .nav-btn { display: block; text-align: center; text-decoration: none; background: #fff; color: #000; padding: 12px; border-radius: 10px; font-weight: 800; margin-top: 15px; font-size: 0.9rem; }
+  
+  .loader { text-align: center; padding: 30px; color: var(--primary); font-weight: 700; font-style: italic; }
+  .empty { text-align: center; padding: 30px; background: rgba(248, 81, 73, 0.1); border-radius: 15px; border: 1px dashed #f85149; }
 </style>
 </head>
 <body>
 
-<h1>⛽ CarbuFuel V4</h1>
-<p class="subtitle">Prix en temps réel · Gien & France</p>
+<header>
+  <h1>CARBUFUEL PRO</h1>
+  <p style="color: var(--text-dim); font-size: 0.9rem;">Données officielles — Modèle Carburants.org</p>
+</header>
 
-<div class="search-box">
-  <input id="city" type="text" placeholder="Ville ou Code Postal..." onkeypress="if(event.key==='Enter') search()">
-  <button class="btn-ghost" onclick="search()">🔍</button>
-  <button class="btn-ghost" onclick="gps()">📍</button>
+<div class="search-area">
+  <div class="input-group">
+    <input id="city" type="text" placeholder="Gien, Paris, 08300..." onkeypress="if(event.key==='Enter') search()">
+    <button class="btn-icon" onclick="search()">🔍</button>
+    <button class="btn-icon" onclick="gps()">📍</button>
+  </div>
+  
+  <div class="input-group">
+    <select id="fuel">
+      <option value="gazole">Gazole (Diesel)</option>
+      <option value="sp95">Sans Plomb 95</option>
+      <option value="e10" selected>SP95-E10</option>
+      <option value="sp98">Sans Plomb 98</option>
+      <option value="e85">Superéthanol E85</option>
+      <option value="gplc">GPLc</option>
+    </select>
+    <select id="dist" style="max-width: 90px;">
+      <option value="10">10km</option>
+      <option value="20" selected>20km</option>
+      <option value="50">50km</option>
+    </select>
+  </div>
+  
+  <button class="btn-main" onclick="load()">Trouver le meilleur prix</button>
 </div>
-
-<div style="display: flex; gap: 8px;">
-  <select id="fuelType">
-    <option value="gazole">Gazole</option>
-    <option value="sp95">Sans Plomb 95</option>
-    <option value="e10" selected>SP95-E10</option>
-    <option value="sp98">Sans Plomb 98</option>
-    <option value="e85">Ethanol E85</option>
-    <option value="gplc">GPLc</option>
-  </select>
-  <select id="radius" style="max-width: 100px;">
-    <option value="5">5km</option>
-    <option value="15" selected>15km</option>
-    <option value="30">30km</option>
-    <option value="50">50km</option>
-  </select>
-</div>
-
-<button class="btn-primary" onclick="loadData()">VOIR LES PRIX</button>
 
 <div id="result"></div>
 
 <script>
-let userLat = 47.68, userLon = 2.62; // Défaut : Gien
-let stations = [];
+let lat = 47.68, lon = 2.62; // Gien par défaut
 
-function haversine(lat1, lon1, lat2, lon2) {
+function getDist(la1, lo1, la2, lo2) {
   const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  const dLat = (la2-la1)*Math.PI/180, dLon = (lo2-lo1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
 async function search() {
   const q = document.getElementById('city').value;
   if(!q) return;
-  const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}`);
-  const d = await r.json();
-  if(d.features.length) {
-    userLat = d.features[0].geometry.coordinates[1];
-    userLon = d.features[0].geometry.coordinates[0];
-    loadData();
-  }
+  try {
+    const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}`);
+    const d = await r.json();
+    if(d.features.length) {
+      lat = d.features[0].geometry.coordinates[1];
+      lon = d.features[0].geometry.coordinates[0];
+      load();
+    }
+  } catch(e) { alert("Erreur de recherche"); }
 }
 
 function gps() {
   navigator.geolocation.getCurrentPosition(p => {
-    userLat = p.coords.latitude; userLon = p.coords.longitude;
-    loadData();
-  }, () => alert("Veuillez autoriser le GPS"));
+    lat = p.coords.latitude; lon = p.coords.longitude;
+    load();
+  }, () => alert("Activez votre GPS"));
 }
 
-async function loadData() {
-  const fuel = document.getElementById('fuelType').value;
-  const rad = document.getElementById('radius').value;
-  const container = document.getElementById('result');
-  
-  container.innerHTML = '<div class="loading">CHARGEMENT...</div>';
+async function load() {
+  const fuel = document.getElementById('fuel').value;
+  const radius = document.getElementById('dist').value;
+  const res = document.getElementById('result');
+  res.innerHTML = '<div class="loader">SYNCHRONISATION DES PRIX...</div>';
 
-  // Nouvelle URL API V2.1 avec filtrage géographique strict
-  const url = `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=distance(geolocalisation,GEOM'POINT(${userLon} ${userLat})',${rad}km)&limit=50`;
+  const url = `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=distance(geolocalisation,GEOM'POINT(${lon} ${lat})',${radius}km)&limit=100`;
 
   try {
-    const res = await fetch(url);
-    const data = await res.json();
-    const raw = data.results || [];
+    const response = await fetch(url);
+    const data = await response.json();
+    const records = data.results || [];
 
-    stations = raw.map(s => {
-      // Détection dynamique du prix (Gazole_prix OU prix_gazole)
-      let price = s[`prix_${fuel}`] || s[`${fuel}_prix`] || s[fuel];
+    const stations = records.map(s => {
+      // Stratégie de récupération du prix (plusieurs variantes testées)
+      let p = s[`prix_${fuel}`] || s[`${fuel}_prix`] || s[fuel];
+      // Récupération de la date de mise à jour
+      let dateUp = s[`${fuel}_maj`] || s.maj_e10 || s.horaires_automate_24_24; 
+
       return {
         nom: s.nom || s.enseigne || "Station",
-        adresse: s.adresse,
-        ville: s.ville,
-        prix: parseFloat(price),
-        dist: haversine(userLat, userLon, s.geolocalisation.lat, s.geolocalisation.lon),
-        lat: s.geolocalisation.lat,
-        lon: s.geolocalisation.lon
+        adr: s.adresse + ", " + s.ville,
+        prix: parseFloat(p),
+        distance: getDist(lat, lon, s.geolocalisation.lat, s.geolocalisation.lon),
+        coord: `${s.geolocalisation.lat},${s.geolocalisation.lon}`,
+        maj: dateUp ? new Date(dateUp).toLocaleDateString('fr-FR') : "Récemment"
       };
     })
     .filter(s => s.prix > 0)
     .sort((a, b) => a.prix - b.prix);
 
     if(stations.length === 0) {
-      container.innerHTML = `<div class="error">Aucun résultat pour ${fuel.toUpperCase()} dans un rayon de ${rad}km autour de cette zone.</div>`;
+      res.innerHTML = '<div class="empty"><b>Aucun résultat.</b><br>Essayez d\'élargir le rayon ou de changer de carburant.</div>';
     } else {
-      render();
+      res.innerHTML = stations.map((s, i) => `
+        <div class="station-card" style="${i===0 ? 'border: 2px solid var(--success)' : ''}">
+          <div class="flex-row">
+            <div>
+              <div class="brand">${s.nom}</div>
+              <div class="meta">${s.adr}</div>
+              <div class="meta" style="font-weight:600">${s.distance.toFixed(1)} km de vous</div>
+              <div class="update-tag">Mise à jour : ${s.maj}</div>
+            </div>
+            <div class="price">${s.prix.toFixed(3)}€</div>
+          </div>
+          <a class="nav-btn" href="https://www.google.com/maps/dir/?api=1&destination=${s.coord}">🚀 CALCULER L'ITINÉRAIRE</a>
+        </div>
+      `).join('');
     }
   } catch(e) {
-    container.innerHTML = '<div class="error">Erreur réseau. Vérifiez votre connexion.</div>';
+    res.innerHTML = '<div class="empty">Erreur de connexion aux données.</div>';
   }
 }
 
-function render() {
-  const container = document.getElementById('result');
-  container.innerHTML = stations.map((s, index) => `
-    <div class="card" style="${index === 0 ? 'border: 2px solid var(--green)' : ''}">
-      ${index === 0 ? '<div style="color:var(--green); font-weight:900; font-size:0.7rem; margin-bottom:5px">LE MOINS CHER ✅</div>' : ''}
-      <div class="station-info">
-        <div>
-          <div style="font-weight:700; font-size:1.1rem; text-transform:uppercase">${s.nom}</div>
-          <div style="color:#888; font-size:0.85rem">${s.adresse}</div>
-          <div class="dist-tag">${s.dist.toFixed(1)} km - ${s.ville}</div>
-        </div>
-        <div class="price-tag">${s.prix.toFixed(3)}€</div>
-      </div>
-      <a class="maps-btn" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}" target="_blank">Y ALLER</a>
-    </div>
-  `).join('');
-}
-
-// Enregistrement du Service Worker pour le mode hors-ligne
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js');
-}
+// Auto-chargement au démarrage
+window.onload = load;
 </script>
-
 </body>
 </html>
