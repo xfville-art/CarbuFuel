@@ -276,29 +276,6 @@
     Hors ligne — affichage du dernier cache
   </div>
 
-  <!-- GPS PERMISSION MODAL -->
-  <div id="gpsModal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px;">
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px 24px;max-width:340px;width:100%;text-align:center;">
-      <div style="font-size:40px;margin-bottom:14px;">📍</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:2px;margin-bottom:10px;color:var(--text);">LOCALISATION BLOQUÉE</div>
-      <p style="font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:20px;">
-        L'accès à votre position a été refusé.<br>
-        Pour l'activer, allez dans les <strong style="color:var(--text)">paramètres de votre navigateur</strong> et autorisez la localisation pour ce site.
-      </p>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:20px;text-align:left;font-size:13px;color:var(--muted);line-height:1.8;">
-        <div id="gpsInstructions"></div>
-      </div>
-      <div style="display:flex;gap:10px;justify-content:center;">
-        <button id="gpsModalClose" style="padding:11px 20px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;">
-          Utiliser la recherche
-        </button>
-        <button id="gpsModalRetry" style="padding:11px 20px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0a0c0f;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;">
-          Réessayer
-        </button>
-      </div>
-    </div>
-  </div>
-
   <!-- CONTROLS -->
   <div class="controls">
     <div>
@@ -312,9 +289,9 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           Chercher
         </button>
-        <button class="btn-gps" id="btnGps" title="Utiliser ma position GPS">
-          <svg id="gpsIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="9" opacity="0.3"/></svg>
-          <span class="gps-label" id="gpsLabel">GPS</span>
+        <button class="btn-gps" id="btnGps">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="9" opacity="0.3"/></svg>
+          <span class="gps-label">GPS</span>
         </button>
       </div>
     </div>
@@ -539,174 +516,27 @@ async function searchCity(){
   }catch(e){setStatus('Adresse introuvable — essayez un nom de ville','error');}
 }
 
-// ── GPS PERMISSION SYSTEM ─────────────────────────────────────────────────────
-const btnGps = document.getElementById('btnGps');
-const gpsModal = document.getElementById('gpsModal');
-const gpsLabel = document.getElementById('gpsLabel');
-const gpsIcon  = document.getElementById('gpsIcon');
-
-// Détecte le navigateur pour les instructions personnalisées
-function getGpsInstructions() {
-  const ua = navigator.userAgent;
-  const isIOS = /iPhone|iPad|iPod/.test(ua);
-  const isSamsung = /SamsungBrowser/.test(ua);
-  const isFirefox = /Firefox/.test(ua);
-  const isChrome = /Chrome/.test(ua) && !isSamsung;
-
-  if (isIOS) return `
-    <strong style="color:var(--text)">Sur iPhone / Safari :</strong><br>
-    ① Réglages → Safari<br>
-    ② Localisation → <em>Demander</em> ou <em>Autoriser</em><br>
-    ③ Revenez sur l'app et réessayez`;
-  if (isSamsung) return `
-    <strong style="color:var(--text)">Sur Samsung Internet :</strong><br>
-    ① Menu ⋮ → Paramètres → Sites<br>
-    ② Localisation → Autoriser<br>
-    ③ Revenez sur l'app et réessayez`;
-  if (isFirefox) return `
-    <strong style="color:var(--text)">Sur Firefox :</strong><br>
-    ① Cliquez sur 🔒 dans la barre d'adresse<br>
-    ② Autorisations → Accéder à la localisation<br>
-    ③ Rechargez la page`;
-  // Chrome / Android default
-  return `
-    <strong style="color:var(--text)">Sur Chrome Android :</strong><br>
-    ① Appuyez sur 🔒 dans la barre d'adresse<br>
-    ② Autorisations → Localisation → Autoriser<br>
-    ③ Rechargez la page et réessayez`;
-}
-
-function setGpsState(state) {
-  // states: idle | loading | ok | denied | unavailable
-  btnGps.className = 'btn-gps';
-  gpsIcon.style.animation = '';
-  if (state === 'loading') {
-    gpsLabel.textContent = '…';
-    gpsIcon.style.animation = 'pulse 1s infinite';
-    btnGps.disabled = true;
-  } else if (state === 'ok') {
-    gpsLabel.textContent = '✓ GPS';
-    btnGps.style.borderColor = 'var(--green)';
-    btnGps.style.color = 'var(--green)';
-    btnGps.disabled = false;
-  } else if (state === 'denied') {
-    gpsLabel.textContent = 'Bloqué';
-    btnGps.style.borderColor = 'var(--red)';
-    btnGps.style.color = 'var(--red)';
-    btnGps.disabled = false;
-  } else {
-    gpsLabel.textContent = 'GPS';
-    btnGps.style.borderColor = '';
-    btnGps.style.color = '';
-    btnGps.disabled = false;
-  }
-}
-
-function showGpsModal() {
-  document.getElementById('gpsInstructions').innerHTML = getGpsInstructions();
-  gpsModal.style.display = 'flex';
-}
-
-document.getElementById('gpsModalClose').addEventListener('click', () => {
-  gpsModal.style.display = 'none';
-  cityInput.focus();
-});
-document.getElementById('gpsModalRetry').addEventListener('click', () => {
-  gpsModal.style.display = 'none';
-  requestGps();
-});
-gpsModal.addEventListener('click', e => { if (e.target === gpsModal) gpsModal.style.display = 'none'; });
-
-async function requestGps() {
-  if (!navigator.geolocation) {
-    setStatus('GPS non disponible sur ce navigateur.', 'error');
-    setGpsState('unavailable');
-    return;
-  }
-
-  // Vérifie l'état de la permission si l'API est dispo (pas sur Safari iOS < 16)
-  if (navigator.permissions) {
-    try {
-      const perm = await navigator.permissions.query({ name: 'geolocation' });
-      if (perm.state === 'denied') {
-        setGpsState('denied');
-        setStatus('Localisation bloquée — voir les instructions', 'error');
-        showGpsModal();
-        return;
-      }
-      // Écoute les changements futurs
-      perm.onchange = () => {
-        if (perm.state === 'granted') setGpsState('idle');
-        else if (perm.state === 'denied') setGpsState('denied');
-      };
-    } catch {}
-  }
-
-  setGpsState('loading');
-  setStatus('Localisation GPS en cours…', 'loading');
-
+document.getElementById('btnGps').addEventListener('click',()=>{
+  if(!navigator.geolocation){setStatus('GPS non disponible.','error');return;}
+  setStatus('Localisation GPS…','loading');
   navigator.geolocation.getCurrentPosition(
-    async pos => {
-      userLat = pos.coords.latitude;
-      userLon = pos.coords.longitude;
-      setGpsState('ok');
-      try {
-        const r = await fetch(`https://api-adresse.data.gouv.fr/reverse/?lon=${userLon}&lat=${userLat}`);
-        const data = await r.json();
-        const f = data.features?.[0];
-        if (f) {
-          cityInput.value = f.properties.city || f.properties.label || 'Position GPS';
-          userDept = getDept(f.properties.citycode || '', f.properties.postcode || '');
-        } else {
-          cityInput.value = `${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
-          userDept = '';
-        }
-      } catch {
-        cityInput.value = `${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
-        userDept = '';
-      }
+    async pos=>{
+      userLat=pos.coords.latitude;userLon=pos.coords.longitude;
+      try{
+        const r=await fetch(`https://api-adresse.data.gouv.fr/reverse/?lon=${userLon}&lat=${userLat}`);
+        const data=await r.json();
+        const f=data.features?.[0];
+        if(f){
+          cityInput.value=f.properties.city||f.properties.label||'Position GPS';
+          userDept=getDept(f.properties.citycode||'',f.properties.postcode||'');
+        }else{cityInput.value=`${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;userDept='';}
+      }catch{cityInput.value=`${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;userDept='';}
       fetchStations();
     },
-    err => {
-      // PERMISSION_DENIED = 1, POSITION_UNAVAILABLE = 2, TIMEOUT = 3
-      if (err.code === 1) {
-        setGpsState('denied');
-        setStatus('Localisation refusée', 'error');
-        showGpsModal();
-      } else if (err.code === 2) {
-        setGpsState('idle');
-        setStatus('Position indisponible — vérifiez que le GPS est activé', 'error');
-        showToast('⚠️ GPS désactivé sur l\'appareil');
-      } else {
-        setGpsState('idle');
-        setStatus('Délai GPS dépassé — réessayez', 'error');
-      }
-    },
-    { timeout: 12000, enableHighAccuracy: true, maximumAge: 30000 }
+    err=>setStatus('GPS refusé ('+err.message+'). Utilisez la recherche.','error'),
+    {timeout:10000,enableHighAccuracy:true}
   );
-}
-
-btnGps.addEventListener('click', requestGps);
-
-// Vérifie la permission GPS au chargement (silencieusement)
-(async () => {
-  if (navigator.permissions) {
-    try {
-      const perm = await navigator.permissions.query({ name: 'geolocation' });
-      if (perm.state === 'granted') {
-        setGpsState('ok');
-      } else if (perm.state === 'denied') {
-        setGpsState('denied');
-        setStatus('Localisation bloquée — saisissez une ville ou autorisez le GPS', '');
-      }
-      perm.onchange = () => {
-        if (perm.state === 'granted') { setGpsState('ok'); setStatus('Localisation autorisée — cliquez GPS', ''); }
-        else if (perm.state === 'denied') setGpsState('denied');
-        else setGpsState('idle');
-      };
-    } catch {}
-  }
-})();
+});
 
 // ── FETCH ─────────────────────────────────────────────────────────────────────
 async function fetchStations(){
