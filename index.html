@@ -223,24 +223,70 @@ function gps() {
 }
 
 // ── Load data ─────────────────────────────────────────────────────────────────
+const API_URLS = [
+  // v2.1 ODS
+  "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?limit=300",
+  // v1 ODS (fallback)
+  "https://data.economie.gouv.fr/api/records/1.0/search/?dataset=prix-des-carburants-en-france-flux-instantane-v2&rows=300"
+];
+
+// Normalise une entrée quelle que soit la version d'API
+function normalizeRecord(s) {
+  // v2.1 : s.geolocalisation = {lat, lon}
+  if (s.geolocalisation && s.geolocalisation.lat != null) return s;
+  // v1 : s.fields + s.geometry
+  if (s.fields) {
+    const f = s.fields;
+    const geo = s.geometry && s.geometry.coordinates;
+    return {
+      ...f,
+      geolocalisation: geo ? { lat: geo[1], lon: geo[0] } : null,
+      nom: f.nom,
+      ville: f.ville,
+      adresse: f.adresse,
+      prix_sp95: f.prix_sp95,
+      prix_sp98: f.prix_sp98,
+      prix_gazole: f.prix_gazole,
+      prix_e10: f.prix_e10,
+      prix_e85: f.prix_e85,
+      prix_gplc: f.prix_gplc,
+    };
+  }
+  return null;
+}
+
 async function load() {
   showLoader("Chargement des prix...");
-  try {
-    const r = await fetch(
-      "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?limit=300"
-    );
-    const d = await r.json();
+  let raw = [];
 
-    stations = d.results
-      .map(s => {
-        if (!s.geolocalisation) return null;
-        const dist = haversine(userLat, userLon, s.geolocalisation.lat, s.geolocalisation.lon);
-        return { ...s, dist };
-      })
-      .filter(s => s && s.dist < 30);
+  for (const url of API_URLS) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const d = await r.json();
+      // v2.1 → d.results ; v1 → d.records
+      const list = d.results || d.records;
+      if (Array.isArray(list) && list.length > 0) { raw = list; break; }
+    } catch(_) { /* essaye l'URL suivante */ }
+  }
 
-    renderList();
-  } catch(e) { showError("Erreur chargement données : " + e.message); }
+  if (!raw.length) {
+    showError("API indisponible. Réessaie dans quelques instants.");
+    return;
+  }
+
+  stations = raw
+    .map(normalizeRecord)
+    .filter(s => s && s.geolocalisation)
+    .map(s => ({ ...s, dist: haversine(userLat, userLon, s.geolocalisation.lat, s.geolocalisation.lon) }))
+    .filter(s => s.dist < 30);
+
+  if (!stations.length) {
+    showError("Aucune station trouvée dans un rayon de 30 km.");
+    return;
+  }
+
+  renderList();
 }
 
 // ── Prix valides d'une station ────────────────────────────────────────────────
