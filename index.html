@@ -1,143 +1,101 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>CarbuFuel Pro 🚀</title>
-<link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#0a0c0f">
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Barlow:wght@400;600&display=swap');
-  :root { --primary: #f0a500; --success: #3fb950; --bg: #0a0c0f; --card: #161a21; --border: #21262d; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: #fff; font-family: 'Barlow', sans-serif; padding: 15px; max-width: 500px; margin: 0 auto; }
-  
-  header { text-align: center; margin-bottom: 20px; }
-  h1 { font-family: 'Barlow Condensed', sans-serif; font-size: 2.2rem; background: linear-gradient(to right, var(--primary), #e05c2a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-
-  .search-area { background: var(--card); padding: 15px; border-radius: 15px; border: 1px solid var(--border); margin-bottom: 20px; }
-  .input-group { display: flex; gap: 8px; margin-bottom: 10px; }
-  input, select { flex: 1; padding: 12px; background: #0d1117; border: 1px solid var(--border); border-radius: 10px; color: #fff; outline: none; }
-
-  .btn-main { background: var(--primary); color: #000; width: 100%; padding: 14px; border-radius: 10px; border: none; font-weight: 900; font-family: 'Barlow Condensed'; font-size: 1.1rem; cursor: pointer; }
-  
-  .station-card { background: var(--card); border: 1px solid var(--border); border-radius: 15px; padding: 15px; margin-bottom: 12px; }
-  .price { font-family: 'Barlow Condensed', sans-serif; font-size: 2.2rem; font-weight: 900; color: var(--success); }
-  .brand { font-weight: 700; color: var(--primary); text-transform: uppercase; }
-  .meta { color: #8b949e; font-size: 0.85rem; margin-top: 4px; }
-  
-  .nav-btn { display: block; text-align: center; text-decoration: none; background: #fff; color: #000; padding: 10px; border-radius: 8px; font-weight: 800; margin-top: 10px; font-size: 0.85rem; }
-  .error-msg { text-align: center; padding: 20px; border: 1px dashed #f85149; color: #f85149; border-radius: 10px; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CarbuFuel FIX</title>
+    <style>
+        body { background: #0a0c0f; color: white; font-family: sans-serif; padding: 20px; }
+        .card { background: #161a21; border: 1px solid #21262d; padding: 15px; border-radius: 12px; margin-bottom: 10px; }
+        .price { color: #3fb950; font-size: 2rem; font-weight: bold; float: right; }
+        .name { font-weight: bold; font-size: 1.1rem; color: #f0a500; }
+        select, input, button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: none; font-size: 1rem; }
+        button { background: #f0a500; font-weight: bold; cursor: pointer; }
+        .meta { color: #8b949e; font-size: 0.9rem; }
+    </style>
 </head>
 <body>
 
-<header>
-  <h1>CARBUFUEL V4 PRO</h1>
-  <p style="color: #666; font-size: 0.8rem;">Données gouvernementales en direct</p>
-</header>
+    <h2 style="color:#f0a500; text-align:center;">⛽ CarbuFuel GIEN-FIX</h2>
+    
+    <div style="background:#161a21; padding:15px; border-radius:15px; margin-bottom:20px;">
+        <input id="city" type="text" placeholder="Gien, 45500...">
+        <select id="fuel">
+            <option value="gazole">Gazole</option>
+            <option value="e10" selected>SP95-E10</option>
+            <option value="sp98">SP98</option>
+            <option value="e85">E85</option>
+        </select>
+        <button onclick="loadData()">AFFICHER LES PRIX</button>
+    </div>
 
-<div class="search-area">
-  <div class="input-group">
-    <input id="city" type="text" placeholder="Ville ou Code Postal (ex: Gien)">
-    <button onclick="gps()" style="width: 50px; background: #21262d; border: none; border-radius: 10px; cursor: pointer;">📍</button>
-  </div>
-  <div class="input-group">
-    <select id="fuel">
-      <option value="gazole">Gazole</option>
-      <option value="e10" selected>SP95-E10</option>
-      <option value="sp95">SP95</option>
-      <option value="sp98">SP98</option>
-      <option value="e85">E85</option>
-      <option value="gplc">GPLc</option>
-    </select>
-    <select id="dist" style="max-width: 80px;">
-      <option value="10">10km</option>
-      <option value="30" selected>30km</option>
-      <option value="50">50km</option>
-    </select>
-  </div>
-  <button class="btn-main" onclick="load()">TROUVER LES PRIX</button>
-</div>
-
-<div id="result"></div>
+    <div id="result"></div>
 
 <script>
-let uLat = 47.68, uLon = 2.62; // Gien par défaut
+// Coordonnées de Gien par défaut pour être sûr que ça marche chez toi
+let currentLat = 47.6844;
+let currentLon = 2.6289;
 
-async function gps() {
-  navigator.geolocation.getCurrentPosition(p => {
-    uLat = p.coords.latitude; uLon = p.coords.longitude;
-    load();
-  }, () => alert("Activez le GPS"));
-}
+async function loadData() {
+    const resDiv = document.getElementById('result');
+    const fuel = document.getElementById('fuel').value;
+    const city = document.getElementById('city').value;
 
-async function load() {
-  const fuel = document.getElementById('fuel').value;
-  const radius = document.getElementById('dist').value;
-  const cityInput = document.getElementById('city').value;
-  const res = document.getElementById('result');
-  res.innerHTML = '<div style="text-align:center; padding:20px;">Recherche...</div>';
+    resDiv.innerHTML = "<p style='text-align:center'>Recherche en cours dans la base d'État...</p>";
 
-  // Si une ville est tapée, on convertit d'abord en coordonnées
-  if(cityInput) {
-    try {
-      const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(cityInput)}`);
-      const d = await r.json();
-      if(d.features.length) {
-        uLat = d.features[0].geometry.coordinates[1];
-        uLon = d.features[0].geometry.coordinates[0];
-      }
-    } catch(e) {}
-  }
-
-  // REQUÊTE API : On demande tout dans le rayon, sans filtrer le carburant dans l'URL pour éviter les bugs
-  const url = `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=distance(geolocalisation,GEOM'POINT(${uLon} ${uLat})',${radius}km)&limit=100`;
-
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
-    const records = data.results || [];
-
-    const stations = records.map(s => {
-      // On teste TOUTES les clés possibles pour le prix
-      const price = s[`prix_${fuel}`] || s[`${fuel}_prix`] || s[fuel];
-      return {
-        nom: s.nom || s.enseigne || "Station",
-        ville: s.ville,
-        adr: s.adresse,
-        prix: parseFloat(price) || 0,
-        lat: s.geolocalisation.lat,
-        lon: s.geolocalisation.lon
-      };
-    })
-    .filter(s => s.prix > 0) // On ne garde que celles qui ont le carburant choisi
-    .sort((a, b) => a.prix - b.prix);
-
-    if(stations.length === 0) {
-      res.innerHTML = `<div class="error-msg"><b>Aucune station trouvée</b><br>pour du ${fuel.toUpperCase()} à moins de ${radius}km.</div>`;
-    } else {
-      res.innerHTML = stations.map(s => `
-        <div class="station-card">
-          <div style="display:flex; justify-content:space-between; align-items:start;">
-            <div>
-              <div class="brand">${s.nom}</div>
-              <div class="meta">${s.adr}</div>
-              <div class="meta" style="color:#3fb950">📍 ${s.ville}</div>
-            </div>
-            <div class="price">${s.prix.toFixed(3)}€</div>
-          </div>
-          <a class="nav-btn" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}" target="_blank">Y ALLER</a>
-        </div>
-      `).join('');
+    // 1. Si une ville est entrée, on cherche ses coordonnées
+    if(city) {
+        try {
+            const rCity = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(city)}`);
+            const dCity = await rCity.json();
+            if(dCity.features.length > 0) {
+                currentLon = dCity.features[0].geometry.coordinates[0];
+                currentLat = dCity.features[0].geometry.coordinates[1];
+            }
+        } catch(e) { console.log("Erreur ville"); }
     }
-  } catch(e) {
-    res.innerHTML = '<div class="error-msg">Erreur de connexion API</div>';
-  }
+
+    // 2. Requête simplifiée au maximum (on cherche les 50 plus proches de Gien/Position)
+    // On enlève le filtre 'where' complexe qui fait souvent tout bugger
+    const url = `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?order_by=distance(geolocalisation%2C%20GEOM'POINT(${currentLon}%20${currentLat})')&limit=50`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        const rawStations = data.results || [];
+
+        // 3. On trie et on filtre nous-mêmes en JavaScript
+        const filtered = rawStations.map(s => {
+            // On cherche le prix peu importe le nom de la colonne
+            const p = s[`prix_${fuel}`] || s[`${fuel}_prix`] || s[fuel];
+            return {
+                nom: s.nom || s.enseigne || "Station",
+                adresse: s.adresse || s.ville,
+                ville: s.ville || "",
+                prix: parseFloat(p),
+                dist: s.dist || 0 // L'API v2.1 renvoie parfois directement la distance
+            };
+        }).filter(s => s.prix > 0);
+
+        if(filtered.length === 0) {
+            resDiv.innerHTML = `<div class='card'>❌ Aucun prix trouvé pour ${fuel}.<br>L'API ne répond pas pour ce carburant en ce moment.</div>`;
+        } else {
+            resDiv.innerHTML = filtered.map(s => `
+                <div class="card">
+                    <div class="price">${s.prix.toFixed(3)}€</div>
+                    <div class="name">${s.nom}</div>
+                    <div class="meta">${s.adresse}</div>
+                    <div class="meta" style="color:#3fb950">📍 ${s.ville}</div>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        resDiv.innerHTML = "<div class='card'>Erreur réseau. Réessaye dans 10 secondes.</div>";
+    }
 }
 
-// Charger au lancement
-window.onload = load;
+// Lancer au démarrage pour Gien
+window.onload = loadData;
 </script>
 </body>
 </html>
