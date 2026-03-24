@@ -247,7 +247,7 @@
 </head>
 <body>
 
-<div class="offline-banner" id="offlineBanner">📡 Hors-ligne — données en cache</div>
+<div class="offline-banner" id="offlineBanner">📡 Hors-ligne — données en cache &nbsp;<button onclick="forceUpdate()" style="padding:3px 10px;font-size:.8rem;background:var(--orange);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:700">Mettre à jour</button></div>
 
 <h1>⛽ CarbuFuel</h1>
 <p class="subtitle">Prix carburants en temps réel · France</p>
@@ -292,7 +292,12 @@ let userLat = null, userLon = null, stations = [], activeFuel = 'all', sortMode 
 
 // ── Service Worker ────────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    // Forcer la mise à jour immédiate du SW
+    reg.update();
+    if (reg.waiting) reg.waiting.postMessage('skipWaiting');
+    navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
+  }).catch(() => {});
 }
 
 // ── Offline banner ────────────────────────────────────────────────────────────
@@ -718,6 +723,17 @@ function copyText(text) {
     const orig = btn.textContent;
     btn.textContent = "✅ Copié !";
     setTimeout(() => btn.textContent = orig, 1800);
+  });
+}
+
+function forceUpdate() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => r.unregister());
+    });
+  }
+  caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => {
+    location.reload(true);
   });
 }
 

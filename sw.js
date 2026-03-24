@@ -1,6 +1,6 @@
 // ── CarbuFuel Service Worker v5 ───────────────────────────────────────────────
-const CACHE_VERSION = 'carbufuel-v5';
-const SHELL_CACHE   = 'carbufuel-shell-v5';
+const CACHE_VERSION = 'carbufuel-v6';
+const SHELL_CACHE   = 'carbufuel-shell-v6';
 
 const SHELL_ASSETS = [
   './',
@@ -24,7 +24,7 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys.filter(k => k !== CACHE_VERSION && k !== SHELL_CACHE).map(k => caches.delete(k))
+        keys.map(k => caches.delete(k))
       )
     ).then(() => self.clients.claim())
   );
