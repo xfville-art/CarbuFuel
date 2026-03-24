@@ -48,16 +48,17 @@
 
   .subtitle { color: #555; font-size: 0.85rem; margin-bottom: 20px; }
 
-  /* Correction de la barre de recherche pour éviter le dépassement */
+  /* Barre de recherche fixée pour ne pas dépasser */
   .search-row { 
     display: flex; 
     gap: 6px; 
     margin-bottom: 12px; 
     width: 100%;
+    align-items: center;
   }
   input[type=text] {
     flex: 1; 
-    min-width: 0; /* Important pour flexbox */
+    min-width: 0; 
     padding: 12px; 
     background: var(--card); 
     border: 1px solid var(--border);
@@ -66,8 +67,12 @@
     font-size: 0.95rem; 
     outline: none;
   }
-  .btn-search {
-    padding: 0 12px;
+  .btn-icon {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -81,13 +86,10 @@
   input[type=range] { flex: 1; accent-color: var(--orange); }
   #radiusVal { color: var(--orange); font-weight: 700; min-width: 45px; text-align: right; }
 
-  /* Boutons d'action */
   button {
     padding: 12px; border-radius: 10px; border: none; cursor: pointer;
     font-weight: 700; font-family: 'Barlow Condensed', sans-serif; font-size: 1rem;
-    transition: transform .1s;
   }
-  button:active { transform: scale(.97); }
   .btn-primary { background: linear-gradient(135deg, var(--orange), var(--red)); color: #000; }
   .btn-ghost { background: var(--card); color: #aaa; border: 1px solid var(--border); }
   .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
@@ -100,21 +102,25 @@
   }
   .fuel-btn.active { background: var(--orange); color: #000; border-color: var(--orange); }
 
-  /* Style des cartes avec LOGO */
+  /* STYLE DES CARTES AVEC LOGOS */
   .card {
     background: var(--card); border: 1px solid var(--border); border-radius: 14px;
     padding: 18px; margin-bottom: 12px; animation: fadeUp .35s ease both;
   }
   @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
-  .station-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 15px; }
-  .station-logo {
+  .station-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+  
+  /* L'élément LOGO dynamique */
+  .station-logo-box {
     width: 48px; height: 48px; background: #0d0f12; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
     font-weight: 900; font-size: 1.1rem; color: var(--orange); border: 1px solid var(--border); flex-shrink: 0;
+    text-align: center; line-height: 1;
   }
+
   .station-info { flex: 1; min-width: 0; }
-  .station-name { font-family: 'Barlow Condensed', sans-serif; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+  .station-name { font-family: 'Barlow Condensed', sans-serif; font-size: 1.3rem; font-weight: 800; text-transform: uppercase; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .station-city { color: #555; font-size: 0.8rem; margin-top: 2px; }
 
   .price-main { text-align: right; flex-shrink: 0; }
@@ -122,16 +128,15 @@
   .price-unit { font-size: 0.7rem; color: #555; }
 
   .prices-mini { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #1e2229; }
-  .price-chip { padding: 3px 7px; border-radius: 5px; font-size: .75rem; font-weight: 600; background: #1a1e25; color: #ccc; border: 1px solid var(--border); }
+  .price-chip { padding: 4px 8px; border-radius: 6px; font-size: .75rem; font-weight: 600; background: #1a1e25; color: #ccc; border: 1px solid var(--border); }
   .price-chip.active { border-color: var(--orange); color: var(--orange); }
 
   .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: .7rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; }
   .tag-green { background: #1a2a1a; color: var(--green); }
   .tag-red { background: #2a1a1a; color: var(--danger); }
 
-  textarea { width: 100%; background: #0d0f12; color: #3fb950; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: 'Barlow', sans-serif; font-size: .85rem; margin-top: 10px; }
+  textarea { width: 100%; background: #0d0f12; color: #3fb950; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: 'Barlow', sans-serif; margin-top: 10px; }
   .loader { display: inline-block; width: 18px; height: 18px; border: 2px solid #333; border-top-color: var(--orange); border-radius: 50%; animation: spin .7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -141,8 +146,8 @@
 
 <div class="search-row">
   <input id="city" type="text" placeholder="Ville ou CP..." onkeydown="if(event.key==='Enter')search()">
-  <button class="btn-search" onclick="search()">🔍</button>
-  <button class="btn-search" onclick="gps()">📍</button>
+  <div class="btn-icon" onclick="search()">🔍</div>
+  <div class="btn-icon" onclick="gps()">📍</div>
 </div>
 
 <div class="radius-row">
@@ -184,11 +189,11 @@ const FUEL_KEYS = {
   gplc: ['gplc_prix', 'prix_gplc', 'Prix_GPLc', 'GPLc','GPL'],
 };
 
-// Logique des logos par enseigne
+// Fonction pour générer un logo texte stylisé selon l'enseigne
 function getStationLogo(name) {
   const n = (name || "").toUpperCase();
   if (n.includes('TOTAL')) return 'TE';
-  if (n.includes('LECLERC') || n.includes('E.LECLERC')) return 'E.L';
+  if (n.includes('LECLERC') || n.includes('E.L')) return 'E.L';
   if (n.includes('CARREFOUR')) return 'C.F';
   if (n.includes('INTERMARCHE')) return 'I.M';
   if (n.includes('SYSTEME U') || n.includes('SUPER U') || n.includes('MAGASIN U')) return 'U';
@@ -196,7 +201,6 @@ function getStationLogo(name) {
   if (n.includes('AVIA')) return 'AV';
   if (n.includes('BP')) return 'BP';
   if (n.includes('AUCHAN')) return 'AU';
-  if (n.includes('CASINO')) return 'CA';
   return '⛽';
 }
 
@@ -247,7 +251,7 @@ async function search() {
 
 function gps() {
   if (!navigator.geolocation) return;
-  showLoader("GPS...");
+  showLoader("Position...");
   navigator.geolocation.getCurrentPosition(p => {
     userLat = p.coords.latitude; userLon = p.coords.longitude;
     load();
@@ -263,7 +267,9 @@ async function load() {
     const d = await r.json();
     stations = (d.results || []).map(s => {
       const lat = s.geom?.lat || 0; const lon = s.geom?.lon || 0;
-      return { ...s, nom: s.nom || s.enseigne || "Station", _lat: lat, _lon: lon, dist: haversine(userLat, userLon, lat, lon) };
+      // Utilisation du nom réel de l'enseigne fourni par l'API
+      const realName = s.nom || s.enseigne || "Station";
+      return { ...s, nom: realName, _lat: lat, _lon: lon, dist: haversine(userLat, userLon, lat, lon) };
     }).sort((a,b) => a.dist - b.dist);
     renderList();
   } catch(e) { showError("Erreur réseau."); }
@@ -284,7 +290,7 @@ function renderList() {
     html += `
     <div class="card">
       <div class="station-header">
-        <div class="station-logo">${getStationLogo(s.nom)}</div>
+        <div class="station-logo-box">${getStationLogo(s.nom)}</div>
         <div class="station-info">
           <div class="station-name">${s.nom}</div>
           <div class="station-city">${s.ville} · ${s.dist.toFixed(1)} km</div>
@@ -292,7 +298,7 @@ function renderList() {
         </div>
         <div class="price-main">
           <div class="price-val ${isCheap ? 'green' : (isExp ? 'red' : '')}">${p ? p.toFixed(3) : '---'}</div>
-          <div class="price-unit">€/L</div>
+          <div class="price-unit">€/Litre</div>
         </div>
       </div>
       <div class="prices-mini">
@@ -301,13 +307,13 @@ function renderList() {
           return val ? `<span class="price-chip ${activeFuel === f ? 'active' : ''}">${f.toUpperCase()} ${val.toFixed(3)}</span>` : '';
         }).join('')}
       </div>
-      <button class="btn-ghost" onclick="window.open('https://www.google.com/maps?q=${s._lat},${s._lon}')" style="width:100%; margin-top:12px; font-size:.8rem; padding:8px">🗺️ VOIR SUR MAPS</button>
+      <button class="btn-ghost" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${s._lat},${s._lon}')" style="width:100%; margin-top:12px; font-size:.8rem; padding:8px">🗺️ VOIR SUR MAPS</button>
     </div>`;
   });
   document.getElementById("result").innerHTML = html;
 }
 
-// TikTok / Stats Logic
+// Logic TikTok & Stats
 function getBestWorst() {
   let best = null, worst = null;
   const fuel = activeFuel === 'all' ? 'gazole' : activeFuel;
@@ -324,21 +330,20 @@ function bestDeal() {
   if (!requireStations()) return;
   const { best, worst } = getBestWorst();
   if (!best) return;
-  const eco = ((worst.price - best.price) * 50).toFixed(2);
   document.getElementById("result").innerHTML = `
     <div class="card" style="border-color:var(--orange)">
       <div class="station-header">
-        <div class="station-logo">${getStationLogo(best.s.nom)}</div>
+        <div class="station-logo-box">${getStationLogo(best.s.nom)}</div>
         <div class="station-info">
           <div class="station-name orange">🔥 MEILLEUR PRIX</div>
           <div class="station-city">${best.s.nom} · ${best.s.ville}</div>
         </div>
       </div>
       <div style="text-align:center; margin:15px 0;">
-        <div class="price-val green" style="font-size:2.5rem">${best.price.toFixed(3)}€</div>
-        <div style="color:#aaa; font-size:.9rem">Économisez <strong>${eco}€</strong> sur un plein</div>
+        <div class="price-val green" style="font-size:2.4rem">${best.price.toFixed(3)}€</div>
+        <div style="color:#aaa; font-size:.9rem">Gain : <strong>${((worst.price - best.price)*50).toFixed(2)}€</strong> sur 50L</div>
       </div>
-      <button class="btn-primary" onclick="window.open('https://www.google.com/maps?q=${best.s._lat},${best.s._lon}')" style="width:100%">🗺️ Y ALLER</button>
+      <button class="btn-primary" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${best.s._lat},${best.s._lon}')" style="width:100%">🗺️ Y ALLER</button>
     </div>`;
 }
 
@@ -349,14 +354,14 @@ function renderStats() {
   document.getElementById("result").innerHTML = `
     <div class="card">
       <div class="station-name">📊 ANALYSE LOCALE</div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:15px;">
-        <div style="background:#0d0f12; padding:15px; border-radius:10px; text-align:center;">
-          <div class="green" style="font-size:1.5rem; font-weight:900;">${best.price.toFixed(3)}€</div>
-          <div style="font-size:0.7rem; color:#555;">MINIMUM</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
+        <div style="background:#0d0f12; padding:12px; border-radius:10px; text-align:center;">
+          <div class="green" style="font-size:1.4rem; font-weight:900;">${best.price.toFixed(3)}€</div>
+          <div style="font-size:0.7rem; color:#555;">MINI</div>
         </div>
-        <div style="background:#0d0f12; padding:15px; border-radius:10px; text-align:center;">
-          <div class="red" style="font-size:1.5rem; font-weight:900;">${worst.price.toFixed(3)}€</div>
-          <div style="font-size:0.7rem; color:#555;">MAXIMUM</div>
+        <div style="background:#0d0f12; padding:12px; border-radius:10px; text-align:center;">
+          <div class="red" style="font-size:1.4rem; font-weight:900;">${worst.price.toFixed(3)}€</div>
+          <div style="font-size:0.7rem; color:#555;">MAXI</div>
         </div>
       </div>
     </div>`;
@@ -365,37 +370,30 @@ function renderStats() {
 function generateContent() {
   const { best, worst } = getBestWorst();
   if (!best) return;
-  const script = `🚨 ALERTE ESSENCE\n\nStation la plus chère : ${worst.price.toFixed(3)}€\nStation la moins chère : ${best.price.toFixed(3)}€\n\n💸 Tu gagnes ${((worst.price - best.price)*50).toFixed(2)}€ sur ton plein !\n📍 Ça se passe à ${best.s.ville}`;
+  const script = `🚨 ALERTE ESSENCE\n\nCher : ${worst.price.toFixed(3)}€\nMoins cher : ${best.price.toFixed(3)}€\n\n💸 Économie : ${((worst.price - best.price)*50).toFixed(2)}€ sur un plein !\n📍 ${best.s.ville}`;
   renderTextArea("🎬 SCRIPT TIKTOK", script);
 }
 
 function autoTikTok() {
   const { best, worst } = getBestWorst();
   if (!best) return;
-  const gain = ((worst.price - best.price) * 50).toFixed(2);
-  const combined = `🚨 ARNAQUE À LA POMPE\n⛽ ${worst.price.toFixed(3)}€ vs ${best.price.toFixed(3)}€\n💸 Gain : ${gain}€ sur 50L\n📍 ${best.s.ville}\n👉 Abonne-toi !`;
-  renderTextArea("🤖 AUTO TIKTOK", combined);
+  const t = `🚨 ARNAQUE À LA POMPE\n⛽ ${worst.price.toFixed(3)}€ vs ${best.price.toFixed(3)}€\n💸 Gain : ${((worst.price - best.price)*50).toFixed(2)}€\n📍 ${best.s.ville}`;
+  renderTextArea("🤖 AUTO TIKTOK", t);
 }
 
 function generateVideo() {
   const { best, worst } = getBestWorst();
-  const prompt = `Vertical cinematic shot, high contrast. Overlay text: "🚨 SAVE ${((worst.price - best.price)*50).toFixed(2)}€ ON FUEL". Cut from price ${worst.price.toFixed(3)} to ${best.price.toFixed(3)}. Background: gas station at night.`;
+  const prompt = `Vertical cinematic video, high contrast. Overlay: "SAVE ${((worst.price - best.price)*50).toFixed(2)}€". Compare ${worst.price.toFixed(3)} and ${best.price.toFixed(3)}. Background: Gas station night shot.`;
   renderTextArea("🎥 PROMPT VIDÉO IA", prompt);
 }
 
 function renderTextArea(title, text) {
-  document.getElementById("result").innerHTML = `
-    <div class="card">
-      <div class="station-name">${title}</div>
-      <textarea rows="8" id="copyArea">${text}</textarea>
-      <button class="btn-primary" style="width:100%; margin-top:10px" onclick="copyText()">📋 COPIER LE TEXTE</button>
-    </div>`;
+  document.getElementById("result").innerHTML = `<div class="card"><div class="station-name">${title}</div><textarea rows="8" id="copyArea">${text}</textarea><button class="btn-primary" style="width:100%; margin-top:10px" onclick="copyText()">📋 COPIER</button></div>`;
 }
 
 function copyText() {
   const t = document.getElementById("copyArea");
-  t.select(); navigator.clipboard.writeText(t.value);
-  alert("Copié dans le presse-papier !");
+  t.select(); navigator.clipboard.writeText(t.value); alert("Copié !");
 }
 
 function requireStations() { if (!stations.length) { showError("Cherchez une ville d'abord 📍"); return false; } return true; }
