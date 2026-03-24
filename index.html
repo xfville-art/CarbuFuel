@@ -27,7 +27,7 @@
   .f-pill.active { background: #fff; color: #000; border-color: #fff; }
 
   /* Station Card Premium */
-  .st-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 15px; position: relative; overflow: hidden; }
+  .st-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 15px; position: relative; overflow: hidden; cursor: pointer; }
   .st-card::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--brand-color, #333); }
   
   .st-logo { width: 48px; height: 48px; border-radius: 10px; background: #1a1a1c; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; border: 1px solid var(--border); }
@@ -91,12 +91,14 @@ const TRAD = [
   { m: 'AVIA', n: 'AVIA', c: '#e30613', i: '⛽' }
 ];
 
-function cleanData(s) {
-  const raw = JSON.stringify(s).toUpperCase();
+function cleanData(station) {
+  const rawName = (station.enseigne || station.nom || "").toUpperCase();
   for (let t of TRAD) {
-    if (raw.includes(t.m)) return t;
+    if (rawName.includes(t.m)) return { n: t.n, c: t.c, i: t.i };
   }
-  return { n: s.enseigne || s.nom || "STATION", c: '#333', i: '⛽' };
+  const name = station.enseigne || station.nom || "STATION";
+  const firstLetter = name[0] || "⛽";
+  return { n: name.toUpperCase(), c: '#333', i: firstLetter };
 }
 
 function getP(s, f) {
@@ -132,7 +134,8 @@ async function fetchData() {
   stations = d.results.map(s => ({
     ...s,
     ui: cleanData(s),
-    dist: Math.sqrt((s.geom.lat-lat)**2 + (s.geom.lon-lon)**2) * 111
+    dist: Math.sqrt((s.geom.lat-lat)**2 + (s.geom.lon-lon)**2) * 111,
+    ville: s.fields.ville || ""
   })).sort((a,b) => a.dist - b.dist);
   renderList();
 }
@@ -188,7 +191,7 @@ function autoTikTok() {
 }
 
 function generateVideo() {
-  document.getElementById('result').innerHTML = `<textarea rows="4" readonly>Video 9:16. Zoom on ${activeFuel} price. Flashy text: "GIEN: DONT PAY TOO MUCH". Show ${activeFuel} at ${stations[0].ui.n}.</textarea>`;
+  document.getElementById('result').innerHTML = `<textarea rows="4" readonly>Video 9:16. Zoom on ${activeFuel} price. Flashy text: "GIEN: DONT PAY TOO MUCH". Show ${activeFuel} at ${stations[0]?.ui.n || "STATION"}.</textarea>`;
 }
 </script>
 </body>
