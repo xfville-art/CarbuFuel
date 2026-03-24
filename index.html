@@ -319,18 +319,25 @@ function haversine(a, b, c, d) {
   return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
+function normalizeCoord(value, type = 'lat') {
+  const n = parseFloat(value);
+  if (!Number.isFinite(n)) return null;
+  const max = type === 'lon' ? 180 : 90;
+  return Math.abs(n) > max ? n / 100000 : n;
+}
+
 // ── Extract prices from a station record ─────────────────────────────────────
 // Parsing des prix — supporte plusieurs formats d'API :
 //  - data.economie.gouv.fr v2.1 : prix_sp95, prix_gazole...
 //  - api.prix-carburants.2aaz.fr : Prix_SP95, Prix_Gazole...  (clé Capitalisée)
 //  - Tableau { nom, valeur } ou { nom, prix }
 const FUEL_KEYS = {
-  sp95:   ['prix_sp95',  'Prix_SP95',  'SP95',  'sp95'],
-  sp98:   ['prix_sp98',  'Prix_SP98',  'SP98',  'sp98'],
-  e10:    ['prix_e10',   'Prix_E10',   'E10',   'e10'],
-  gazole: ['prix_gazole','Prix_Gazole','Gazole', 'gazole','DIESEL'],
-  e85:    ['prix_e85',   'Prix_E85',   'E85',   'e85'],
-  gplc:   ['prix_gplc',  'Prix_GPLc',  'GPLc',  'gplc','GPL'],
+  sp95:   ['sp95_prix', 'prix_sp95',  'Prix_SP95',  'SP95',  'sp95'],
+  sp98:   ['sp98_prix', 'prix_sp98',  'Prix_SP98',  'SP98',  'sp98'],
+  e10:    ['e10_prix',  'prix_e10',   'Prix_E10',   'E10',   'e10'],
+  gazole: ['gazole_prix','prix_gazole','Prix_Gazole','Gazole','gazole','DIESEL'],
+  e85:    ['e85_prix',  'prix_e85',   'Prix_E85',   'E85',   'e85'],
+  gplc:   ['gplc_prix', 'prix_gplc',  'Prix_GPLc',  'GPLc',  'gplc','GPL'],
 };
 
 function extractFuelPrice(s, fuel) {
@@ -344,8 +351,8 @@ function extractFuelPrice(s, fuel) {
   if (Array.isArray(carbs)) {
     const names = FUEL_KEYS[fuel] || [];
     for (const entry of carbs) {
-      const nom = (entry.Nom || entry.nom || entry.name || '').toLowerCase();
-      const val = parseFloat(entry.Prix || entry.prix || entry.valeur || entry.value || 0);
+      const nom = (entry.Nom || entry.nom || entry.name || entry['@nom'] || '').toLowerCase();
+      const val = parseFloat(entry.Prix || entry.prix || entry.valeur || entry.value || entry['@valeur'] || 0);
       if (val > 0 && names.some(n => nom.includes(n.toLowerCase()))) return val;
     }
   }
@@ -353,8 +360,8 @@ function extractFuelPrice(s, fuel) {
   if (Array.isArray(s.prix)) {
     const names = FUEL_KEYS[fuel] || [];
     for (const entry of s.prix) {
-      const nom = (entry.nom || entry.name || '').toLowerCase();
-      const val = parseFloat(entry.valeur || entry.prix || entry.value || 0);
+      const nom = (entry.nom || entry.name || entry['@nom'] || '').toLowerCase();
+      const val = parseFloat(entry.valeur || entry.prix || entry.value || entry['@valeur'] || 0);
       if (val > 0 && names.some(n => nom.includes(n.toLowerCase()))) return val;
     }
   }
@@ -364,8 +371,8 @@ function extractFuelPrice(s, fuel) {
       const arr = JSON.parse(s.prix);
       const names = FUEL_KEYS[fuel] || [];
       for (const entry of arr) {
-        const nom = (entry.nom || entry.name || '').toLowerCase();
-        const val = parseFloat(entry.valeur || entry.prix || 0);
+        const nom = (entry.nom || entry.name || entry['@nom'] || '').toLowerCase();
+        const val = parseFloat(entry.valeur || entry.prix || entry['@valeur'] || 0);
         if (val > 0 && names.some(n => nom.includes(n.toLowerCase()))) return val;
       }
     } catch {}
@@ -419,6 +426,12 @@ function gps() {
     async p => {
       userLat = p.coords.latitude;
       userLon = p.coords.longitude;
+      try {
+        const r = await fetch(`https://api-adresse.data.gouv.fr/reverse/?lon=${encodeURIComponent(userLon)}&lat=${encodeURIComponent(userLat)}&limit=1`);
+        const d = await r.json();
+        const cp = d?.features?.[0]?.properties?.postcode || '';
+        userDep = cp.startsWith('97') ? cp.substring(0,3) : cp.substring(0,2);
+      } catch {}
       await load();
     },
     () => showError("Accès GPS refusé. Essaie de saisir ta ville manuellement.")
@@ -429,10 +442,10 @@ function gps() {
 // Stratégie : essayer plusieurs URLs en cascade, afficher debug en cas d'échec
 
 const APIS = [
-  // API 1 : OpenDataSoft v2.1 avec where=cp (filtrage par départ, le plus stable)
+  // API 1 : OpenDataSoft v2.1 avec filtre fiable par code postal/département
   (lat, lon, radius, dep) => {
-    const where = dep ? `cp like "${dep}%"` : `prix_sp95 > 0`;
-    return `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=${encodeURIComponent(where)}&limit=200`;
+    const where = dep ? `startswith(cp, \"${dep}\")` : `gazole_prix is not null`;
+    return `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=${encodeURIComponent(where)}&limit=100`;
   },
   // API 2 : 2aaz par département
   (lat, lon, radius, dep) => dep
@@ -457,19 +470,46 @@ async function load() {
       const r = await fetch(url);
       if (!r.ok) { lastError = `Source ${i+1}: HTTP ${r.status}`; continue; }
       const d = await r.json();
-      const raw = Array.isArray(d) ? d : (d.results || d.data || []);
+      let raw = Array.isArray(d) ? d : (d.results || d.data || []);
+
+      // L'API OpenDataSoft limite à 100 lignes max par requête : on pagine si besoin
+      if (i === 0 && d.total_count && raw.length < d.total_count) {
+        const total = Math.min(d.total_count, 1000);
+        for (let offset = raw.length; offset < total; offset += 100) {
+          const nextUrl = new URL(url);
+          nextUrl.searchParams.set('offset', offset);
+          const r2 = await fetch(nextUrl.toString());
+          if (!r2.ok) break;
+          const d2 = await r2.json();
+          const rows2 = Array.isArray(d2) ? d2 : (d2.results || d2.data || []);
+          if (!rows2.length) break;
+          raw = raw.concat(rows2);
+          if (rows2.length < 100) break;
+        }
+      }
+
       if (raw.length === 0) { lastError = `Source ${i+1}: 0 résultats`; continue; }
 
       // Parsing universel
       stations = raw.map(s => {
         let lat = null, lon = null;
-        if (s.Latitude  != null) { lat = parseFloat(s.Latitude);  lon = parseFloat(s.Longitude); }
-        else if (s.latitude != null) { lat = parseFloat(s.latitude); lon = parseFloat(s.longitude); }
-        else if (s.geolocalisation) {
-          lat = parseFloat(s.geolocalisation.lat || s.geolocalisation.latitude || 0);
-          lon = parseFloat(s.geolocalisation.lon || s.geolocalisation.longitude || 0);
+        if (s.Latitude  != null) {
+          lat = normalizeCoord(s.Latitude, 'lat');
+          lon = normalizeCoord(s.Longitude, 'lon');
         }
-        if (!lat || !lon) return null;
+        else if (s.latitude != null) {
+          lat = normalizeCoord(s.latitude, 'lat');
+          lon = normalizeCoord(s.longitude, 'lon');
+        }
+        else if (s.geom?.geometry?.coordinates) {
+          lon = normalizeCoord(s.geom.geometry.coordinates[0], 'lon');
+          lat = normalizeCoord(s.geom.geometry.coordinates[1], 'lat');
+        }
+        else if (s.geolocalisation) {
+          lat = normalizeCoord(s.geolocalisation.lat || s.geolocalisation.latitude, 'lat');
+          lon = normalizeCoord(s.geolocalisation.lon || s.geolocalisation.longitude, 'lon');
+        }
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
         const dist = haversine(userLat, userLon, lat, lon);
         const nom     = s.Nom     || s.nom     || s.Name     || s.enseigne || 'Station';
         const ville   = s.Ville   || s.ville   || s.City     || s.cp       || '';
@@ -685,7 +725,7 @@ function autoTikTok() {
           <div class="muted" style="margin-bottom:4px">Version ${i + 1}</div>
           <textarea rows="5">${s}</textarea>
         </div>`).join('')}
-      <button class="btn-primary" style="width:100%" onclick="copyText(${JSON.stringify(combined)})">📋 Tout copier</button>
+      <button class="btn-primary" style="width:100%" onclick='copyText(${JSON.stringify(combined)}, this)'>📋 Tout copier</button>
     </div>`;
 }
 
@@ -728,17 +768,18 @@ function renderTextArea(title, text) {
       <div class="big" style="margin-bottom:8px">${title}</div>
       <textarea rows="10">${text}</textarea>
       <div style="margin-top:12px">
-        <button class="btn-primary" style="width:100%" onclick="copyText(${JSON.stringify(text)})">📋 Copier</button>
+        <button class="btn-primary" style="width:100%" onclick='copyText(${JSON.stringify(text)}, this)'>📋 Copier</button>
       </div>
     </div>`;
 }
 
-function copyText(text) {
+function copyText(text, btn) {
   navigator.clipboard.writeText(text).then(() => {
-    const btn = event.target;
-    const orig = btn.textContent;
-    btn.textContent = "✅ Copié !";
-    setTimeout(() => btn.textContent = orig, 1800);
+    const targetBtn = btn || event?.target;
+    if (!targetBtn) return;
+    const orig = targetBtn.textContent;
+    targetBtn.textContent = "✅ Copié !";
+    setTimeout(() => targetBtn.textContent = orig, 1800);
   });
 }
 
@@ -771,5 +812,6 @@ function requireStations() {
   return true;
 }
 </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
