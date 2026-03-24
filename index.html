@@ -3,10 +3,98 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CarbuFuel FIX</title>
+<title>CarbuFuel PRO</title>
+<style>
+body {font-family: Arial; background:#050505; color:#fff; padding:15px;}
+input,button {padding:10px;margin:5px;border-radius:8px;border:none;}
+button{background:#ff9500;color:#000;font-weight:bold;}
+.card{background:#121214;padding:10px;margin:10px 0;border-radius:10px;}
+</style>
 </head>
 <body>
-<h2>CarbuFuel fonctionne ✅</h2>
-<p>Version corrigée prête.</p>
+
+<h2>⛽ CarbuFuel PRO</h2>
+
+<input id="city" placeholder="Ville...">
+<button onclick="search()">Rechercher</button>
+<button onclick="gps()">📍 GPS</button>
+
+<div id="result"></div>
+
+<script>
+let lat, lon, stations=[];
+
+function cleanName(n){
+ if(!n) return "STATION";
+ return n.toUpperCase();
+}
+
+async function search(){
+ const v=document.getElementById('city').value;
+ if(!v) return;
+ const r=await fetch("https://api-adresse.data.gouv.fr/search/?q="+v);
+ const d=await r.json();
+ if(d.features.length){
+  lon=d.features[0].geometry.coordinates[0];
+  lat=d.features[0].geometry.coordinates[1];
+  fetchData();
+ }
+}
+
+function gps(){
+ navigator.geolocation.getCurrentPosition(p=>{
+  lat=p.coords.latitude;
+  lon=p.coords.longitude;
+  fetchData();
+ });
+}
+
+async function fetchData(){
+ try{
+  const url=`https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?limit=30&where=within_distance(geom,geom'POINT(${lon} ${lat})',20000)`;
+  const r=await fetch(url);
+  const d=await r.json();
+
+  stations=(d.results||[]).map(s=>{
+   const price=parseFloat(s.gazole_prix||s.Gazole||0);
+   return{
+    name: cleanName(s.enseigne||s.nom),
+    ville: s.ville||"",
+    price: price,
+    lat: s.geom?.lat,
+    lon: s.geom?.lon
+   }
+  }).filter(s=>s.price>0).sort((a,b)=>a.price-b.price);
+
+  render();
+
+ }catch(e){
+  document.getElementById("result").innerHTML="❌ Erreur API";
+ }
+}
+
+function render(){
+ if(!stations.length){
+  document.getElementById("result").innerHTML="❌ Aucune station";
+  return;
+ }
+
+ let html="";
+ stations.forEach(s=>{
+  html+=`
+  <div class="card" onclick="go(${s.lat},${s.lon})">
+    <b>${s.name}</b><br>
+    ${s.ville}<br>
+    💰 ${s.price.toFixed(3)} €/L
+  </div>`;
+ });
+ document.getElementById("result").innerHTML=html;
+}
+
+function go(lat,lon){
+ window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`);
+}
+</script>
+
 </body>
 </html>
