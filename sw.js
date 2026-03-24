@@ -15,16 +15,17 @@ const SHELL_ASSETS = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(SHELL_CACHE)
-      .then(cache => cache.addAll(SHELL_ASSETS))
+      .then(cache => Promise.allSettled(SHELL_ASSETS.map(asset => cache.add(asset))))
       .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', event => {
+  const keep = new Set([CACHE_VERSION, SHELL_CACHE]);
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys.map(k => caches.delete(k))
+        keys.filter(k => !keep.has(k)).map(k => caches.delete(k))
       )
     ).then(() => self.clients.claim())
   );
