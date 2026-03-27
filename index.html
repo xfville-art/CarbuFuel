@@ -280,49 +280,61 @@ function setSearching(on) {
 async function load() {
   if (isLoading) return;
   isLoading = true;
-  var radiusM = parseInt(document.getElementById('radius').value) * 1000;
+  var radiusM = parseInt(document.getElementById('radiusVal').textContent) * 1000;
+  // Recalcul propre du rayon en metres
+  radiusM = parseInt(document.getElementById('radius').value) * 1000;
   showLoading();
   try {
-    var url = 'https://api.prix-carburants.2aaz.fr/stations/around/' + userLat + ',' + userLon + '/?m=' + radiusM;
-    var r = await fetch(url);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    var raw = await r.json();
+    /* ETAPE 1 : liste des stations autour (sans prix) */
+    var urlAround = 'https://api.prix-carburants.2aaz.fr/stations/around/' + userLat + ',' + userLon + '/?m=' + radiusM;
+    var r1 = await fetch(urlAround);
+    if (!r1.ok) throw new Error('HTTP ' + r1.status);
+    var listRaw = await r1.json();
 
-    /* ---- DEBUG : log structure API dans la console ---- */
-    if (raw && raw.length > 0) {
-      console.group('CarbuFuel DEBUG - Structure API 2aaz');
-      console.log('Station[0]:', JSON.parse(JSON.stringify(raw[0])));
-      if (Array.isArray(raw[0].Fuels) && raw[0].Fuels.length > 0) {
-        console.log('Fuels[0]:', JSON.parse(JSON.stringify(raw[0].Fuels[0])));
-        console.log('Keys Fuels[0]:', Object.keys(raw[0].Fuels[0]));
-        console.log('getPrice(Fuels[0]):', getPrice(raw[0].Fuels[0]));
-      }
-      console.groupEnd();
-    }
-    /* ---- FIN DEBUG ---- */
-
-    if (!Array.isArray(raw) || raw.length === 0) {
-      showState('\uD83C\uDDD\uFE0F',
-        'Aucune station dans ' + document.getElementById('radiusVal').textContent + '.<br>Essayez d\'&#233;largir le rayon.');
+    if (!Array.isArray(listRaw) || listRaw.length === 0) {
+      showState('\uD83C\uDFDC\uFE0F',
+        'Aucune station dans ' + document.getElementById('radiusVal').textContent + '.<br>Essayez d\'agrandir le rayon.');
       return;
     }
 
-    stations = raw
-      .filter(function(s) { return s.Coordinates && s.Coordinates.latitude && s.Coordinates.longitude; })
-      .map(function(s) {
-        var brandName = (s.Brand && s.Brand.name) ? s.Brand.name : (s.name || 'Station');
-        return {
-          id:       s.id,
-          nom:      brandName,
-          brand:    brandName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(),
-          lat:      s.Coordinates.latitude,
-          lon:      s.Coordinates.longitude,
-          address:  (s.Address && s.Address.street_line) ? s.Address.street_line : '',
-          city:     (s.Address && s.Address.city_line)   ? s.Address.city_line   : '',
-          fuels:    normalizeFuels(Array.isArray(s.Fuels) ? s.Fuels : []),
-          dist:     haversine(userLat, userLon, s.Coordinates.latitude, s.Coordinates.longitude)
-        };
+    /* On prend au max 20 stations (les plus proches, deja triees par l'API) */
+    var slice = listRaw.slice(0, 20);
+
+    /* ETAPE 2 : fetch /station/{id} en parallele pour obtenir les prix */
+    var BASE = 'https://api.prix-carburants.2aaz.fr/station/';
+    var detailPromises = slice.map(function(s) {
+      return fetch(BASE + s.id)
+        .then(function(res) { return res.ok ? res.json() : null; })
+        .catch(function()   { return null; });
+    });
+    showLoading('Chargement des prix (' + slice.length + ' stations)\u2026');
+    var details = await Promise.all(detailPromises);
+
+    /* ETAPE 3 : fusion metadata (around) + prix (detail) */
+    stations = [];
+    for (var i = 0; i < slice.length; i++) {
+      var s    = slice[i];
+      var det  = details[i];
+      if (!s.Coordinates || !s.Coordinates.latitude) continue;
+
+      var brandName = (s.Brand && s.Brand.name) ? s.Brand.name : (s.name || 'Station');
+      /* Fuels depuis le detail si disponible, sinon fallback sur l'objet around */
+      var rawFuels = (det && Array.isArray(det.Fuels) && det.Fuels.length > 0)
+        ? det.Fuels
+        : (Array.isArray(s.Fuels) ? s.Fuels : []);
+
+      stations.push({
+        id:      s.id,
+        nom:     brandName,
+        brand:   brandName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(),
+        lat:     s.Coordinates.latitude,
+        lon:     s.Coordinates.longitude,
+        address: (s.Address && s.Address.street_line) ? s.Address.street_line : '',
+        city:    (s.Address && s.Address.city_line)   ? s.Address.city_line   : '',
+        fuels:   normalizeFuels(rawFuels),
+        dist:    haversine(userLat, userLon, s.Coordinates.latitude, s.Coordinates.longitude)
       });
+    }
 
     render();
   } catch(e) {
@@ -487,9 +499,10 @@ function formatAge(iso) {
   } catch(e) { return ''; }
 }
 
-function showLoading() {
+function showLoading(msg) {
+  msg = msg || 'Chargement des stations\u2026';
   document.getElementById('result').innerHTML =
-    '<div class="state-card loading"><span class="loader"></span> Chargement des stations\u2026</div>';
+    '<div class="state-card loading"><span class="loader"></span> ' + msg + '</div>';
 }
 function showState(icon, msg, isError) {
   document.getElementById('result').innerHTML =
