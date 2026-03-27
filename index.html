@@ -442,11 +442,66 @@ const BRAND_MAP = {
   'shell': {bg: '#fbce07', c: '#cc0000', domain: 'shell.fr'}
 };
 
-// Fonction améliorée pour extraire le prix de n'importe quel format
+// Table de correspondance des noms de carburants
+const FUEL_NAME_MAP = {
+  // E10 et ses variantes
+  'E10': 'E10',
+  'SP95-E10': 'E10',
+  'SP95E10': 'E10',
+  'Sans Plomb 95-E10': 'E10',
+  '95-E10': 'E10',
+  
+  // SP95
+  'SP95': 'SP95',
+  'Sans Plomb 95': 'SP95',
+  '95': 'SP95',
+  
+  // SP98
+  'SP98': 'SP98',
+  'Sans Plomb 98': 'SP98',
+  '98': 'SP98',
+  
+  // Gazole
+  'Gazole': 'Gazole',
+  'Diesel': 'Gazole',
+  'Gasoil': 'Gazole',
+  'GO': 'Gazole',
+  
+  // E85
+  'E85': 'E85',
+  'Superethanol': 'E85',
+  'Superéthanol': 'E85',
+  'Ethanol': 'E85',
+  
+  // GPL
+  'GPLc': 'GPLc',
+  'GPL': 'GPLc',
+  'LPG': 'GPLc'
+};
+
+// Normalise un nom de carburant vers notre standard
+function normalizeFuelName(rawName) {
+  if (!rawName) return null;
+  
+  const cleanName = rawName.trim().toUpperCase();
+  
+  // Recherche directe
+  if (FUEL_NAME_MAP[cleanName]) return FUEL_NAME_MAP[cleanName];
+  
+  // Recherche partielle
+  for (let [key, value] of Object.entries(FUEL_NAME_MAP)) {
+    if (cleanName.includes(key) || key.includes(cleanName)) {
+      return value;
+    }
+  }
+  
+  // Fallback: retourner le nom original nettoyé
+  return cleanName.replace(/\s+/g, '').substring(0, 15);
+}
+
 function extractPrice(fuelObj) {
   if (!fuelObj) return null;
   
-  // Essayer tous les chemins possibles
   const paths = [
     () => fuelObj.Price?.amount,
     () => fuelObj.price?.amount,
@@ -478,34 +533,17 @@ function normalizeFuels(rawFuels) {
     const priceData = extractPrice(fuel);
     if (!priceData || priceData.amount <= 0) return;
     
-    let shortName = (fuel.shortName || fuel.short_name || fuel.name || '').trim();
-    if (!shortName) return;
+    let rawName = fuel.shortName || fuel.short_name || fuel.name || '';
+    const normalizedName = normalizeFuelName(rawName);
     
-    // Normalisation des noms de carburants
-    const nameMap = {
-      'SP95': 'SP95',
-      'SP98': 'SP98', 
-      'E10': 'E10',
-      'E85': 'E85',
-      'Gazole': 'Gazole',
-      'Diesel': 'Gazole',
-      'Gasoil': 'Gazole',
-      'GPL': 'GPLc',
-      'GPLc': 'GPLc'
-    };
+    if (!normalizedName) return;
     
-    for (let [key, value] of Object.entries(nameMap)) {
-      if (shortName.includes(key)) {
-        shortName = value;
-        break;
-      }
-    }
-    
-    if (!byFuel[shortName] || priceData.amount < byFuel[shortName].amount) {
-      byFuel[shortName] = {
-        shortName: shortName,
+    if (!byFuel[normalizedName] || priceData.amount < byFuel[normalizedName].amount) {
+      byFuel[normalizedName] = {
+        shortName: normalizedName,
         amount: priceData.amount,
-        updatedAt: priceData.updatedAt
+        updatedAt: priceData.updatedAt,
+        originalName: rawName
       };
     }
   });
@@ -583,7 +621,6 @@ async function load() {
   showLoading('Recherche des stations...');
   
   try {
-    // Récupérer les stations autour
     const aroundUrl = `https://api.prix-carburants.2aaz.fr/stations/around/${userLat},${userLon}/?m=${radiusM}`;
     const response = await fetch(aroundUrl);
     if (!response.ok) throw new Error('Erreur API');
@@ -595,7 +632,6 @@ async function load() {
     
     showLoading(`Chargement des prix pour ${Math.min(list.length, 20)} stations...`);
     
-    // Récupérer les détails de chaque station (avec prix)
     const slice = list.slice(0, 20);
     const details = await Promise.all(slice.map(s => 
       fetch(`https://api.prix-carburants.2aaz.fr/station/${s.id}`)
@@ -603,7 +639,6 @@ async function load() {
         .catch(() => null)
     ));
     
-    // Construire la liste des stations
     stations = [];
     for (let i = 0; i < slice.length; i++) {
       const s = slice[i];
@@ -611,13 +646,11 @@ async function load() {
       
       if (!s.Coordinates || !s.Coordinates.latitude) continue;
       
-      // Essayer d'abord d'extraire les prix du détail, sinon de l'objet principal
       let fuels = [];
       if (det && det.Fuels && Array.isArray(det.Fuels)) {
         fuels = normalizeFuels(det.Fuels);
       }
       
-      // Fallback: chercher les prix dans l'objet principal
       if (fuels.length === 0 && s.Fuels && Array.isArray(s.Fuels)) {
         fuels = normalizeFuels(s.Fuels);
       }
@@ -641,6 +674,11 @@ async function load() {
       throw new Error('Aucune station avec prix disponibles');
     }
     
+    // Afficher un résumé des carburants trouvés dans la console pour déboguer
+    const allFuels = new Set();
+    stations.forEach(s => s.fuels.forEach(f => allFuels.add(f.shortName)));
+    console.log('Carburants disponibles:', Array.from(allFuels));
+    
     startLiveRefresh();
     render();
     
@@ -653,21 +691,24 @@ async function load() {
 }
 
 function render() {
-  // Filtrer par carburant
   let filtered = stations;
   if (activeFuel !== 'all') {
     filtered = stations.filter(s => s.fuels.some(f => f.shortName === activeFuel));
   }
   
   if (!filtered.length) {
+    // Afficher quels carburants sont disponibles pour aider l'utilisateur
+    const availableFuels = new Set();
+    stations.forEach(s => s.fuels.forEach(f => availableFuels.add(f.shortName)));
+    const availableList = Array.from(availableFuels).join(', ');
+    
     const msg = activeFuel === 'all' 
-      ? 'Aucune station avec prix disponibles dans ce rayon'
-      : `Aucune station proposant du ${activeFuel} avec prix disponibles`;
+      ? `Aucune station avec prix disponibles dans ce rayon`
+      : `Aucune station proposant du "${activeFuel}" avec prix disponibles. Carburants trouvés : ${availableList || 'aucun'}`;
     showState('⛽', msg, false);
     return;
   }
   
-  // Calculer les statistiques de prix par carburant
   const fuelStats = {};
   filtered.forEach(s => {
     s.fuels.forEach(f => {
@@ -681,7 +722,6 @@ function render() {
     fuelStats[fuel].sort((a, b) => a.amount - b.amount);
   });
   
-  // Trier
   const sorted = [...filtered].sort((a, b) => {
     if (sortMode === 'price' && activeFuel !== 'all') {
       const pa = a.fuels.find(f => f.shortName === activeFuel)?.amount || Infinity;
@@ -917,9 +957,8 @@ function showState(icon, msg, isError) {
   document.getElementById('result').innerHTML = `<div class="state-card${isError ? ' error' : ''}"><div style="font-size:3rem;margin-bottom:16px">${icon}</div><p>${msg}</p></div>`;
 }
 
-// Initialisation avec "Gien" pré-rempli
+// Initialisation
 window.addEventListener('DOMContentLoaded', function() {
-  // Recherche automatique si "Gien" est déjà dans le champ
   if (document.getElementById('city').value === 'Gien') {
     setTimeout(searchCity, 500);
   }
