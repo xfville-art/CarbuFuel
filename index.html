@@ -8,7 +8,6 @@
   <meta name="theme-color" content="#0a0f1a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="icon-192.png">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
@@ -37,7 +36,7 @@
     body {
       background: var(--bg-primary);
       color: var(--text-primary);
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: system-ui, -apple-system, 'Inter', sans-serif;
       padding: 20px 16px 100px;
       line-height: 1.5;
     }
@@ -257,6 +256,8 @@
       align-items: baseline;
       justify-content: space-between;
       margin-bottom: 10px;
+      flex-wrap: wrap;
+      gap: 8px;
     }
     .price-amount {
       font-size: 1.4rem;
@@ -310,6 +311,12 @@
     .price-updated.fresh { color: var(--accent-success); }
     .price-updated.recent { color: var(--accent-warning); }
     .price-updated.old { color: var(--accent-danger); }
+    .no-price-message {
+      text-align: center;
+      padding: 20px;
+      color: var(--text-tertiary);
+      font-style: italic;
+    }
     
     .station-footer { display: flex; justify-content: flex-end; }
     .maps-link {
@@ -368,7 +375,7 @@
     <div class="search-group">
       <div class="input-wrapper">
         <span class="input-icon">📍</span>
-        <input type="text" id="city" placeholder="Ville, code postal ou adresse" autocomplete="off">
+        <input type="text" id="city" placeholder="Ville, code postal ou adresse" value="Gien" autocomplete="off">
       </div>
       <button class="icon-btn" id="searchBtn" onclick="searchCity()">🔍</button>
       <button class="icon-btn" id="gpsBtn" onclick="gps()">📍</button>
@@ -435,30 +442,74 @@ const BRAND_MAP = {
   'shell': {bg: '#fbce07', c: '#cc0000', domain: 'shell.fr'}
 };
 
-function getPrice(f) {
-  if (!f) return null;
-  if (f.Price && f.Price.amount != null) return {amount: +f.Price.amount, updatedAt: f.Price.last_update};
-  if (f.price && f.price.amount != null) return {amount: +f.price.amount, updatedAt: f.price.last_update};
+// Fonction améliorée pour extraire le prix de n'importe quel format
+function extractPrice(fuelObj) {
+  if (!fuelObj) return null;
+  
+  // Essayer tous les chemins possibles
+  const paths = [
+    () => fuelObj.Price?.amount,
+    () => fuelObj.price?.amount,
+    () => fuelObj.Price?.value,
+    () => fuelObj.price?.value,
+    () => fuelObj.amount,
+    () => fuelObj.value,
+    () => fuelObj.prix,
+    () => typeof fuelObj === 'number' ? fuelObj : null
+  ];
+  
+  for (let getter of paths) {
+    const val = getter();
+    if (val !== undefined && val !== null && !isNaN(val) && val > 0) {
+      return {
+        amount: parseFloat(val),
+        updatedAt: fuelObj.last_update || fuelObj.Price?.last_update || fuelObj.price?.last_update || null
+      };
+    }
+  }
   return null;
 }
 
 function normalizeFuels(rawFuels) {
   const byFuel = {};
   if (!Array.isArray(rawFuels)) return [];
-  rawFuels.forEach(f => {
-    const p = getPrice(f);
-    if (!p || p.amount <= 0) return;
-    let shortName = (f.shortName || f.short_name || f.name || '').trim();
-    if (shortName.includes('E10')) shortName = 'E10';
-    else if (shortName.includes('GPL')) shortName = 'GPLc';
-    else if (shortName === 'Diesel' || shortName === 'Gasoil') shortName = 'Gazole';
-    else if (shortName === 'SP95') shortName = 'SP95';
-    else if (shortName === 'SP98') shortName = 'SP98';
-    else if (shortName === 'E85') shortName = 'E85';
-    if (!byFuel[shortName] || p.amount < byFuel[shortName].amount) {
-      byFuel[shortName] = { shortName, amount: p.amount, updatedAt: p.updatedAt };
+  
+  rawFuels.forEach(fuel => {
+    const priceData = extractPrice(fuel);
+    if (!priceData || priceData.amount <= 0) return;
+    
+    let shortName = (fuel.shortName || fuel.short_name || fuel.name || '').trim();
+    if (!shortName) return;
+    
+    // Normalisation des noms de carburants
+    const nameMap = {
+      'SP95': 'SP95',
+      'SP98': 'SP98', 
+      'E10': 'E10',
+      'E85': 'E85',
+      'Gazole': 'Gazole',
+      'Diesel': 'Gazole',
+      'Gasoil': 'Gazole',
+      'GPL': 'GPLc',
+      'GPLc': 'GPLc'
+    };
+    
+    for (let [key, value] of Object.entries(nameMap)) {
+      if (shortName.includes(key)) {
+        shortName = value;
+        break;
+      }
+    }
+    
+    if (!byFuel[shortName] || priceData.amount < byFuel[shortName].amount) {
+      byFuel[shortName] = {
+        shortName: shortName,
+        amount: priceData.amount,
+        updatedAt: priceData.updatedAt
+      };
     }
   });
+  
   return Object.values(byFuel);
 }
 
@@ -492,7 +543,7 @@ async function searchCity() {
 
 function gps() {
   if (!navigator.geolocation) {
-    showState('📱', 'Géolocalisation non disponible sur ce navigateur', true);
+    showState('📱', 'Géolocalisation non disponible', true);
     return;
   }
   
@@ -513,9 +564,9 @@ function gps() {
       gpsBtn.disabled = false;
       let errorMsg = '';
       switch(err.code) {
-        case 1: errorMsg = 'Permission refusée. Activez la localisation dans les paramètres.'; break;
-        case 2: errorMsg = 'Position indisponible. Vérifiez que le GPS est activé.'; break;
-        case 3: errorMsg = 'Délai dépassé. Réessayez dans quelques instants.'; break;
+        case 1: errorMsg = 'Permission refusée. Activez la localisation.'; break;
+        case 2: errorMsg = 'Position indisponible. Vérifiez le GPS.'; break;
+        case 3: errorMsg = 'Délai dépassé. Réessayez.'; break;
         default: errorMsg = 'Erreur de géolocalisation.';
       }
       showState('⚠️', errorMsg, true);
@@ -532,12 +583,19 @@ async function load() {
   showLoading('Recherche des stations...');
   
   try {
+    // Récupérer les stations autour
     const aroundUrl = `https://api.prix-carburants.2aaz.fr/stations/around/${userLat},${userLon}/?m=${radiusM}`;
     const response = await fetch(aroundUrl);
     if (!response.ok) throw new Error('Erreur API');
     const list = await response.json();
-    if (!Array.isArray(list) || list.length === 0) throw new Error('Aucune station trouvée');
     
+    if (!Array.isArray(list) || list.length === 0) {
+      throw new Error('Aucune station trouvée dans ce rayon');
+    }
+    
+    showLoading(`Chargement des prix pour ${Math.min(list.length, 20)} stations...`);
+    
+    // Récupérer les détails de chaque station (avec prix)
     const slice = list.slice(0, 20);
     const details = await Promise.all(slice.map(s => 
       fetch(`https://api.prix-carburants.2aaz.fr/station/${s.id}`)
@@ -545,15 +603,26 @@ async function load() {
         .catch(() => null)
     ));
     
+    // Construire la liste des stations
     stations = [];
     for (let i = 0; i < slice.length; i++) {
       const s = slice[i];
       const det = details[i];
+      
       if (!s.Coordinates || !s.Coordinates.latitude) continue;
       
-      const brandName = (s.Brand && s.Brand.name) ? s.Brand.name : (s.name || 'Station');
-      const fuels = normalizeFuels(det && det.Fuels ? det.Fuels : []);
-      if (fuels.length === 0) continue;
+      // Essayer d'abord d'extraire les prix du détail, sinon de l'objet principal
+      let fuels = [];
+      if (det && det.Fuels && Array.isArray(det.Fuels)) {
+        fuels = normalizeFuels(det.Fuels);
+      }
+      
+      // Fallback: chercher les prix dans l'objet principal
+      if (fuels.length === 0 && s.Fuels && Array.isArray(s.Fuels)) {
+        fuels = normalizeFuels(s.Fuels);
+      }
+      
+      const brandName = (s.Brand && s.Brand.name) ? s.Brand.name : (s.name || 'Station Service');
       
       stations.push({
         id: s.id,
@@ -568,11 +637,15 @@ async function load() {
       });
     }
     
-    if (stations.length === 0) throw new Error('Aucune station avec prix disponibles');
+    if (stations.length === 0) {
+      throw new Error('Aucune station avec prix disponibles');
+    }
     
     startLiveRefresh();
     render();
+    
   } catch(e) {
+    console.error('Erreur load:', e);
     showState('⚠️', e.message || 'Erreur de chargement', true);
   } finally {
     isLoading = false;
@@ -580,13 +653,21 @@ async function load() {
 }
 
 function render() {
-  let filtered = activeFuel === 'all' ? stations : stations.filter(s => s.fuels.some(f => f.shortName === activeFuel));
+  // Filtrer par carburant
+  let filtered = stations;
+  if (activeFuel !== 'all') {
+    filtered = stations.filter(s => s.fuels.some(f => f.shortName === activeFuel));
+  }
+  
   if (!filtered.length) {
-    showState('🔍', activeFuel === 'all' ? 'Aucune station dans ce rayon' : `Aucune station proposant du ${activeFuel}`, false);
+    const msg = activeFuel === 'all' 
+      ? 'Aucune station avec prix disponibles dans ce rayon'
+      : `Aucune station proposant du ${activeFuel} avec prix disponibles`;
+    showState('⛽', msg, false);
     return;
   }
   
-  // Calcul des statistiques par carburant
+  // Calculer les statistiques de prix par carburant
   const fuelStats = {};
   filtered.forEach(s => {
     s.fuels.forEach(f => {
@@ -600,6 +681,7 @@ function render() {
     fuelStats[fuel].sort((a, b) => a.amount - b.amount);
   });
   
+  // Trier
   const sorted = [...filtered].sort((a, b) => {
     if (sortMode === 'price' && activeFuel !== 'all') {
       const pa = a.fuels.find(f => f.shortName === activeFuel)?.amount || Infinity;
@@ -610,7 +692,7 @@ function render() {
   });
   
   let html = `<div style="display:flex;justify-content:space-between;margin-bottom:16px">
-    <span style="color:var(--text-secondary)">${sorted.length} station${sorted.length>1?'s':''}</span>
+    <span style="color:var(--text-secondary)">${sorted.length} station${sorted.length>1?'s':''} avec prix</span>
     <span style="background:var(--bg-secondary);padding:4px 12px;border-radius:var(--radius-full);font-size:0.75rem;color:var(--accent-primary)">${document.getElementById('radiusVal').textContent}</span>
   </div>`;
   
@@ -625,41 +707,52 @@ function buildCard(s, fuelStats) {
   const fuelsList = activeFuel === 'all' ? s.fuels : s.fuels.filter(f => f.shortName === activeFuel);
   
   let pricesHtml = '';
-  fuelsList.forEach(f => {
-    const stats = fuelStats[f.shortName];
-    const rank = stats ? stats.findIndex(item => item.stationId === s.id) + 1 : 0;
-    const total = stats ? stats.length : 0;
-    const isBest = rank === 1 && total > 1;
-    const isWorst = rank === total && total > 1;
-    const percentPosition = total > 1 ? ((rank - 1) / (total - 1)) * 100 : 50;
-    const barColor = percentPosition < 33 ? 'cheap' : (percentPosition > 66 ? 'expensive' : 'mid');
-    
-    const age = f.updatedAt ? formatAge(f.updatedAt) : '';
-    const freshClass = f.updatedAt ? getFreshClass(f.updatedAt) : '';
-    
-    pricesHtml += `
-      <div class="price-item" data-key="${s.id}_${f.shortName}">
-        <div class="price-header">
-          <span class="price-fuel-name">${escapeHtml(f.shortName)}</span>
-          <span class="price-rank">${rank > 0 ? `#${rank}/${total}` : ''}</span>
-        </div>
-        <div class="price-main">
-          <span class="price-amount ${isBest ? 'cheap' : (isWorst ? 'expensive' : '')}">${f.amount.toFixed(3)}€</span>
-          <div style="display:flex;gap:6px">
-            ${isBest ? '<span class="price-badge badge-best">🏆 Meilleur prix</span>' : ''}
-            ${isWorst ? '<span class="price-badge badge-worst">⚠️ Plus cher</span>' : ''}
+  
+  if (fuelsList.length === 0) {
+    pricesHtml = '<div class="no-price-message">📊 Prix non disponibles pour ce carburant</div>';
+  } else {
+    fuelsList.forEach(f => {
+      const stats = fuelStats[f.shortName];
+      const rank = stats ? stats.findIndex(item => item.stationId === s.id) + 1 : 0;
+      const total = stats ? stats.length : 0;
+      const isBest = rank === 1 && total > 1;
+      const isWorst = rank === total && total > 1;
+      const percentPosition = total > 1 ? ((rank - 1) / (total - 1)) * 100 : 50;
+      const barColor = percentPosition < 33 ? 'cheap' : (percentPosition > 66 ? 'expensive' : 'mid');
+      
+      const age = f.updatedAt ? formatAge(f.updatedAt) : '';
+      const freshClass = f.updatedAt ? getFreshClass(f.updatedAt) : '';
+      
+      pricesHtml += `
+        <div class="price-item" data-key="${s.id}_${f.shortName}">
+          <div class="price-header">
+            <span class="price-fuel-name">${escapeHtml(f.shortName)}</span>
+            <span class="price-rank">${rank > 0 ? `#${rank}/${total}` : ''}</span>
           </div>
+          <div class="price-main">
+            <span class="price-amount ${isBest ? 'cheap' : (isWorst ? 'expensive' : '')}">${f.amount.toFixed(3)}€</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${isBest ? '<span class="price-badge badge-best">🏆 Meilleur prix</span>' : ''}
+              ${isWorst ? '<span class="price-badge badge-worst">⚠️ Plus cher</span>' : ''}
+            </div>
+          </div>
+          ${total > 1 ? `
+          <div class="price-bar-container">
+            <div class="price-bar ${barColor}" style="width: ${percentPosition}%"></div>
+          </div>
+          <div class="price-footer">
+            <span class="price-updated ${freshClass}">${age ? `🕐 ${age}` : ''}</span>
+            <span style="color:var(--text-tertiary)">${Math.round(percentPosition)}% des stations</span>
+          </div>
+          ` : `
+          <div class="price-footer">
+            <span class="price-updated ${freshClass}">${age ? `🕐 ${age}` : ''}</span>
+          </div>
+          `}
         </div>
-        <div class="price-bar-container">
-          <div class="price-bar ${barColor}" style="width: ${percentPosition}%"></div>
-        </div>
-        <div class="price-footer">
-          <span class="price-updated ${freshClass}">${age ? `🕐 ${age}` : ''}</span>
-          <span style="color:var(--text-tertiary)">${percentPosition.toFixed(0)}% des stations</span>
-        </div>
-      </div>
-    `;
-  });
+      `;
+    });
+  }
   
   return `<div class="station-card">
     <div class="station-header">
@@ -824,14 +917,16 @@ function showState(icon, msg, isError) {
   document.getElementById('result').innerHTML = `<div class="state-card${isError ? ' error' : ''}"><div style="font-size:3rem;margin-bottom:16px">${icon}</div><p>${msg}</p></div>`;
 }
 
-// Raccourci PWA GPS
-if (new URLSearchParams(location.search).get('action') === 'gps') {
-  window.addEventListener('DOMContentLoaded', function() { setTimeout(gps, 500); });
-}
+// Initialisation avec "Gien" pré-rempli
+window.addEventListener('DOMContentLoaded', function() {
+  // Recherche automatique si "Gien" est déjà dans le champ
+  if (document.getElementById('city').value === 'Gien') {
+    setTimeout(searchCity, 500);
+  }
+});
 
-// Service Worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(function(e) { console.log('SW error:', e); });
+  navigator.serviceWorker.register('./sw.js').catch(console.warn);
 }
 </script>
 </body>
