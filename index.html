@@ -188,28 +188,45 @@
     }
     .refresh-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
 
-    .station-header { display: flex; gap: 14px; margin-bottom: 16px; }
+    /* Styles pour les logos */
     .station-logo {
-      width: 52px;
-      height: 52px;
+      width: 56px;
+      height: 56px;
       border-radius: var(--radius-md);
       background: var(--bg-secondary);
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      overflow: hidden;
+      transition: var(--transition-base);
     }
-    .station-logo img { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
-    .logo-abbr {
-      width: 52px;
-      height: 52px;
+    .station-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      padding: 8px;
+    }
+    .station-logo.fallback {
+      background: var(--bg-secondary);
+    }
+    .logo-fallback {
+      width: 56px;
+      height: 56px;
       border-radius: var(--radius-md);
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 800;
-      font-size: 1rem;
+      font-size: 1.1rem;
+      text-transform: uppercase;
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
     }
+    
+    .station-header { display: flex; gap: 14px; margin-bottom: 16px; }
+    .station-info { flex: 1; }
     .station-name { font-weight: 700; font-size: 1rem; margin-bottom: 4px; }
     .station-address { font-size: 0.75rem; color: var(--text-tertiary); margin-bottom: 4px; }
     .station-distance {
@@ -360,6 +377,7 @@
       body { padding: 16px 12px 80px; }
       h1 { font-size: 2rem; }
       .price-amount { font-size: 1.2rem; }
+      .station-logo, .logo-fallback { width: 48px; height: 48px; }
     }
   </style>
 </head>
@@ -431,77 +449,71 @@ let refreshTimer = null;
 let countdownLeft = 900;
 const REFRESH_INTERVAL = 900;
 
-const BRAND_MAP = {
-  'total': {bg: '#c8102e', c: '#fff', domain: 'totalenergies.fr'},
-  'leclerc': {bg: '#003ca6', c: '#f7c300', domain: 'e.leclerc'},
-  'carrefour': {bg: '#004a97', c: '#fff', domain: 'carrefour.fr'},
-  'intermarche': {bg: '#e30613', c: '#fff', domain: 'intermarche.com'},
-  'auchan': {bg: '#e10600', c: '#fff', domain: 'auchan.fr'},
-  'systeme u': {bg: '#c00000', c: '#fff', domain: 'magasins-u.com'},
-  'esso': {bg: '#003087', c: '#fff', domain: 'esso.fr'},
-  'shell': {bg: '#fbce07', c: '#cc0000', domain: 'shell.fr'}
+// Base de données des logos officiels des enseignes
+const BRAND_LOGOS = {
+  // Supermarchés
+  'leclerc': { url: 'https://logo.clearbit.com/e.leclerc', bg: '#003ca6', fallbackColor: '#003ca6', domain: 'e.leclerc' },
+  'carrefour': { url: 'https://logo.clearbit.com/carrefour.fr', bg: '#004a97', fallbackColor: '#004a97', domain: 'carrefour.fr' },
+  'auchan': { url: 'https://logo.clearbit.com/auchan.fr', bg: '#e10600', fallbackColor: '#e10600', domain: 'auchan.fr' },
+  'intermarche': { url: 'https://logo.clearbit.com/intermarche.com', bg: '#e30613', fallbackColor: '#e30613', domain: 'intermarche.com' },
+  'systeme u': { url: 'https://logo.clearbit.com/magasins-u.com', bg: '#c00000', fallbackColor: '#c00000', domain: 'magasins-u.com' },
+  'casino': { url: 'https://logo.clearbit.com/casino.fr', bg: '#c41230', fallbackColor: '#c41230', domain: 'casino.fr' },
+  'cora': { url: 'https://logo.clearbit.com/cora.fr', bg: '#e30613', fallbackColor: '#e30613', domain: 'cora.fr' },
+  
+  // Pétroliers
+  'total': { url: 'https://logo.clearbit.com/totalenergies.fr', bg: '#c8102e', fallbackColor: '#c8102e', domain: 'totalenergies.fr' },
+  'totalenergies': { url: 'https://logo.clearbit.com/totalenergies.fr', bg: '#c8102e', fallbackColor: '#c8102e', domain: 'totalenergies.fr' },
+  'esso': { url: 'https://logo.clearbit.com/esso.fr', bg: '#003087', fallbackColor: '#003087', domain: 'esso.fr' },
+  'bp': { url: 'https://logo.clearbit.com/bp.com', bg: '#007a33', fallbackColor: '#007a33', domain: 'bp.com' },
+  'shell': { url: 'https://logo.clearbit.com/shell.fr', bg: '#fbce07', fallbackColor: '#fbce07', domain: 'shell.fr' },
+  'avia': { url: 'https://logo.clearbit.com/avia-france.fr', bg: '#e30613', fallbackColor: '#e30613', domain: 'avia-france.fr' },
+  'elf': { url: 'https://logo.clearbit.com/elf.fr', bg: '#ffcd00', fallbackColor: '#ffcd00', domain: 'elf.fr' },
+  
+  // Autres
+  'agip': { url: 'https://logo.clearbit.com/eni.com', bg: '#0066cc', fallbackColor: '#0066cc', domain: 'eni.com' },
+  'eni': { url: 'https://logo.clearbit.com/eni.com', bg: '#0066cc', fallbackColor: '#0066cc', domain: 'eni.com' },
+  'socar': { url: 'https://logo.clearbit.com/socar.az', bg: '#00a651', fallbackColor: '#00a651', domain: 'socar.az' },
+  'darty': { url: 'https://logo.clearbit.com/darty.com', bg: '#e31837', fallbackColor: '#e31837', domain: 'darty.com' }
 };
 
 // Table de correspondance des noms de carburants
 const FUEL_NAME_MAP = {
-  // E10 et ses variantes
   'E10': 'E10',
   'SP95-E10': 'E10',
   'SP95E10': 'E10',
   'Sans Plomb 95-E10': 'E10',
   '95-E10': 'E10',
-  
-  // SP95
   'SP95': 'SP95',
   'Sans Plomb 95': 'SP95',
   '95': 'SP95',
-  
-  // SP98
   'SP98': 'SP98',
   'Sans Plomb 98': 'SP98',
   '98': 'SP98',
-  
-  // Gazole
   'Gazole': 'Gazole',
   'Diesel': 'Gazole',
   'Gasoil': 'Gazole',
   'GO': 'Gazole',
-  
-  // E85
   'E85': 'E85',
   'Superethanol': 'E85',
   'Superéthanol': 'E85',
   'Ethanol': 'E85',
-  
-  // GPL
   'GPLc': 'GPLc',
   'GPL': 'GPLc',
   'LPG': 'GPLc'
 };
 
-// Normalise un nom de carburant vers notre standard
 function normalizeFuelName(rawName) {
   if (!rawName) return null;
-  
   const cleanName = rawName.trim().toUpperCase();
-  
-  // Recherche directe
   if (FUEL_NAME_MAP[cleanName]) return FUEL_NAME_MAP[cleanName];
-  
-  // Recherche partielle
   for (let [key, value] of Object.entries(FUEL_NAME_MAP)) {
-    if (cleanName.includes(key) || key.includes(cleanName)) {
-      return value;
-    }
+    if (cleanName.includes(key) || key.includes(cleanName)) return value;
   }
-  
-  // Fallback: retourner le nom original nettoyé
   return cleanName.replace(/\s+/g, '').substring(0, 15);
 }
 
 function extractPrice(fuelObj) {
   if (!fuelObj) return null;
-  
   const paths = [
     () => fuelObj.Price?.amount,
     () => fuelObj.price?.amount,
@@ -512,7 +524,6 @@ function extractPrice(fuelObj) {
     () => fuelObj.prix,
     () => typeof fuelObj === 'number' ? fuelObj : null
   ];
-  
   for (let getter of paths) {
     const val = getter();
     if (val !== undefined && val !== null && !isNaN(val) && val > 0) {
@@ -528,16 +539,12 @@ function extractPrice(fuelObj) {
 function normalizeFuels(rawFuels) {
   const byFuel = {};
   if (!Array.isArray(rawFuels)) return [];
-  
   rawFuels.forEach(fuel => {
     const priceData = extractPrice(fuel);
     if (!priceData || priceData.amount <= 0) return;
-    
     let rawName = fuel.shortName || fuel.short_name || fuel.name || '';
     const normalizedName = normalizeFuelName(rawName);
-    
     if (!normalizedName) return;
-    
     if (!byFuel[normalizedName] || priceData.amount < byFuel[normalizedName].amount) {
       byFuel[normalizedName] = {
         shortName: normalizedName,
@@ -547,8 +554,45 @@ function normalizeFuels(rawFuels) {
       };
     }
   });
-  
   return Object.values(byFuel);
+}
+
+// Fonction améliorée pour obtenir le logo d'une enseigne
+function getBrandLogo(brandName) {
+  if (!brandName) return null;
+  const normalized = brandName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  
+  // Recherche exacte
+  if (BRAND_LOGOS[normalized]) return BRAND_LOGOS[normalized];
+  
+  // Recherche partielle
+  for (let [key, value] of Object.entries(BRAND_LOGOS)) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function buildLogoElement(brandName, stationName) {
+  const brandData = getBrandLogo(brandName);
+  const abbr = stationName.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() || '??';
+  
+  if (brandData) {
+    // Logo officiel
+    return `<div class="station-logo">
+      <img src="${brandData.url}" 
+           alt="${stationName}"
+           data-fallback-bg="${brandData.bg}"
+           data-abbr="${abbr}"
+           onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'logo-fallback\\' style=\\'background:${brandData.bg};color:white\\'>${abbr}</div>'">
+    </div>`;
+  } else {
+    // Pas de logo trouvé, afficher une abréviation avec couleur générique
+    const colors = ['#c8102e', '#003ca6', '#e10600', '#e30613', '#c00000', '#004a97', '#007a33'];
+    const color = colors[Math.abs(brandName.length) % colors.length];
+    return `<div class="logo-fallback" style="background:${color};color:white">${abbr}</div>`;
+  }
 }
 
 function updateRadius(val) {
@@ -559,11 +603,9 @@ function updateRadius(val) {
 async function searchCity() {
   const q = document.getElementById('city').value.trim();
   if (!q) return;
-  
   const searchBtn = document.getElementById('searchBtn');
   searchBtn.textContent = '⏳';
   searchBtn.disabled = true;
-  
   try {
     const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&limit=1`);
     const d = await r.json();
@@ -584,11 +626,9 @@ function gps() {
     showState('📱', 'Géolocalisation non disponible', true);
     return;
   }
-  
   const gpsBtn = document.getElementById('gpsBtn');
   gpsBtn.textContent = '⏳';
   gpsBtn.disabled = true;
-  
   navigator.geolocation.getCurrentPosition(
     function(pos) {
       userLat = pos.coords.latitude;
@@ -625,13 +665,9 @@ async function load() {
     const response = await fetch(aroundUrl);
     if (!response.ok) throw new Error('Erreur API');
     const list = await response.json();
-    
-    if (!Array.isArray(list) || list.length === 0) {
-      throw new Error('Aucune station trouvée dans ce rayon');
-    }
+    if (!Array.isArray(list) || list.length === 0) throw new Error('Aucune station trouvée');
     
     showLoading(`Chargement des prix pour ${Math.min(list.length, 20)} stations...`);
-    
     const slice = list.slice(0, 20);
     const details = await Promise.all(slice.map(s => 
       fetch(`https://api.prix-carburants.2aaz.fr/station/${s.id}`)
@@ -643,24 +679,18 @@ async function load() {
     for (let i = 0; i < slice.length; i++) {
       const s = slice[i];
       const det = details[i];
-      
       if (!s.Coordinates || !s.Coordinates.latitude) continue;
       
       let fuels = [];
-      if (det && det.Fuels && Array.isArray(det.Fuels)) {
-        fuels = normalizeFuels(det.Fuels);
-      }
-      
-      if (fuels.length === 0 && s.Fuels && Array.isArray(s.Fuels)) {
-        fuels = normalizeFuels(s.Fuels);
-      }
+      if (det && det.Fuels && Array.isArray(det.Fuels)) fuels = normalizeFuels(det.Fuels);
+      if (fuels.length === 0 && s.Fuels && Array.isArray(s.Fuels)) fuels = normalizeFuels(s.Fuels);
       
       const brandName = (s.Brand && s.Brand.name) ? s.Brand.name : (s.name || 'Station Service');
       
       stations.push({
         id: s.id,
         nom: brandName,
-        brand: brandName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
+        brand: brandName,
         lat: s.Coordinates.latitude,
         lon: s.Coordinates.longitude,
         address: (s.Address && s.Address.street_line) || '',
@@ -670,18 +700,9 @@ async function load() {
       });
     }
     
-    if (stations.length === 0) {
-      throw new Error('Aucune station avec prix disponibles');
-    }
-    
-    // Afficher un résumé des carburants trouvés dans la console pour déboguer
-    const allFuels = new Set();
-    stations.forEach(s => s.fuels.forEach(f => allFuels.add(f.shortName)));
-    console.log('Carburants disponibles:', Array.from(allFuels));
-    
+    if (stations.length === 0) throw new Error('Aucune station avec prix disponibles');
     startLiveRefresh();
     render();
-    
   } catch(e) {
     console.error('Erreur load:', e);
     showState('⚠️', e.message || 'Erreur de chargement', true);
@@ -697,11 +718,9 @@ function render() {
   }
   
   if (!filtered.length) {
-    // Afficher quels carburants sont disponibles pour aider l'utilisateur
     const availableFuels = new Set();
     stations.forEach(s => s.fuels.forEach(f => availableFuels.add(f.shortName)));
     const availableList = Array.from(availableFuels).join(', ');
-    
     const msg = activeFuel === 'all' 
       ? `Aucune station avec prix disponibles dans ce rayon`
       : `Aucune station proposant du "${activeFuel}" avec prix disponibles. Carburants trouvés : ${availableList || 'aucun'}`;
@@ -747,7 +766,6 @@ function buildCard(s, fuelStats) {
   const fuelsList = activeFuel === 'all' ? s.fuels : s.fuels.filter(f => f.shortName === activeFuel);
   
   let pricesHtml = '';
-  
   if (fuelsList.length === 0) {
     pricesHtml = '<div class="no-price-message">📊 Prix non disponibles pour ce carburant</div>';
   } else {
@@ -759,7 +777,6 @@ function buildCard(s, fuelStats) {
       const isWorst = rank === total && total > 1;
       const percentPosition = total > 1 ? ((rank - 1) / (total - 1)) * 100 : 50;
       const barColor = percentPosition < 33 ? 'cheap' : (percentPosition > 66 ? 'expensive' : 'mid');
-      
       const age = f.updatedAt ? formatAge(f.updatedAt) : '';
       const freshClass = f.updatedAt ? getFreshClass(f.updatedAt) : '';
       
@@ -796,7 +813,7 @@ function buildCard(s, fuelStats) {
   
   return `<div class="station-card">
     <div class="station-header">
-      ${buildLogo(s.brand, s.nom)}
+      ${buildLogoElement(s.brand, s.nom)}
       <div class="station-info">
         <div class="station-name">${escapeHtml(s.nom)}</div>
         ${address ? `<div class="station-address">📍 ${escapeHtml(address)}</div>` : ''}
@@ -808,18 +825,6 @@ function buildCard(s, fuelStats) {
       <a class="maps-link" href="${mapsUrl}" target="_blank">🗺️ Ouvrir dans Maps →</a>
     </div>
   </div>`;
-}
-
-function buildLogo(brandNorm, nom) {
-  let style = {bg: '#1e2532', c: '#94a3b8', domain: ''};
-  for (let [key, val] of Object.entries(BRAND_MAP)) {
-    if (brandNorm.includes(key)) { style = val; break; }
-  }
-  const abbr = nom.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() || '??';
-  if (style.domain) {
-    return `<div class="station-logo"><img src="https://logo.clearbit.com/${style.domain}" alt="${abbr}" onerror="this.parentElement.innerHTML='<div class=\\'logo-abbr\\' style=\\'background:${style.bg};color:${style.c}\\'>${abbr}</div>'"></div>`;
-  }
-  return `<div class="logo-abbr" style="background:${style.bg};color:${style.c}">${abbr}</div>`;
 }
 
 function haversine(lat1, lon1, lat2, lon2) {
@@ -887,28 +892,17 @@ function updateLiveBar() {
 
 async function refreshPricesOnly() {
   if (!stations.length) return;
-  
   const oldPrices = {};
-  stations.forEach(s => {
-    s.fuels.forEach(f => {
-      oldPrices[`${s.id}_${f.shortName}`] = f.amount;
-    });
-  });
-  
+  stations.forEach(s => s.fuels.forEach(f => oldPrices[`${s.id}_${f.shortName}`] = f.amount));
   const details = await Promise.all(stations.map(s => 
     fetch(`https://api.prix-carburants.2aaz.fr/station/${s.id}`)
       .then(r => r.ok ? r.json() : null)
       .catch(() => null)
   ));
-  
   stations.forEach((s, i) => {
-    if (details[i] && details[i].Fuels) {
-      s.fuels = normalizeFuels(details[i].Fuels);
-    }
+    if (details[i] && details[i].Fuels) s.fuels = normalizeFuels(details[i].Fuels);
   });
-  
   render();
-  
   setTimeout(function() {
     for (let key in oldPrices) {
       const [id, fuel] = key.split('_');
@@ -957,16 +951,11 @@ function showState(icon, msg, isError) {
   document.getElementById('result').innerHTML = `<div class="state-card${isError ? ' error' : ''}"><div style="font-size:3rem;margin-bottom:16px">${icon}</div><p>${msg}</p></div>`;
 }
 
-// Initialisation
 window.addEventListener('DOMContentLoaded', function() {
-  if (document.getElementById('city').value === 'Gien') {
-    setTimeout(searchCity, 500);
-  }
+  if (document.getElementById('city').value === 'Gien') setTimeout(searchCity, 500);
 });
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(console.warn);
-}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(console.warn);
 </script>
 </body>
 </html>
