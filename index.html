@@ -6,6 +6,7 @@
   <title>CarbuFuel · Prix carburants en temps réel</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0a0f1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
@@ -17,7 +18,6 @@
       --accent-primary: #f59e0b;
       --accent-success: #10b981;
       --accent-danger: #ef4444;
-      --accent-warning: #f59e0b;
       --accent-info: #3b82f6;
       --text-primary: #f1f5f9;
       --text-secondary: #94a3b8;
@@ -144,16 +144,6 @@
     .sort-btn.active { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(245,158,11,0.1); }
     .sort-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    .warning-banner {
-      background: rgba(245,158,11,0.15);
-      border-left: 3px solid var(--accent-warning);
-      padding: 12px 16px;
-      border-radius: var(--radius-lg);
-      margin-bottom: 20px;
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-    }
-
     .station-logo {
       width: 56px;
       height: 56px;
@@ -165,7 +155,12 @@
       flex-shrink: 0;
       overflow: hidden;
     }
-    .station-logo img { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
+    .station-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      padding: 8px;
+    }
     .logo-fallback {
       width: 56px;
       height: 56px;
@@ -254,12 +249,6 @@
       background: rgba(239,68,68,0.2);
       color: var(--accent-danger);
       border: 1px solid var(--accent-danger);
-    }
-    .badge-demo {
-      background: rgba(245,158,11,0.2);
-      color: var(--accent-warning);
-      border: 1px solid var(--accent-warning);
-      font-size: 0.65rem;
     }
     .price-bar-container {
       width: 100%;
@@ -377,7 +366,7 @@ let activeFuel = 'all';
 let sortMode = 'dist';
 let isLoading = false;
 
-// Base de données des logos
+// Logos via Clearbit - version stable
 const BRAND_LOGOS = {
   'leclerc': { url: 'https://logo.clearbit.com/e.leclerc', bg: '#003ca6' },
   'carrefour': { url: 'https://logo.clearbit.com/carrefour.fr', bg: '#004a97' },
@@ -388,42 +377,6 @@ const BRAND_LOGOS = {
   'esso': { url: 'https://logo.clearbit.com/esso.fr', bg: '#003087' },
   'shell': { url: 'https://logo.clearbit.com/shell.fr', bg: '#fbce07' }
 };
-
-// Données de démonstration pour les stations qui n'ont pas de prix
-function generateDemoPrices(brandName, stationId) {
-  // Prix fictifs réalistes (varient selon l'enseigne)
-  const basePrices = {
-    'Gazole': 1.65 + (Math.random() * 0.15),
-    'SP95': 1.75 + (Math.random() * 0.12),
-    'E10': 1.70 + (Math.random() * 0.12),
-    'SP98': 1.82 + (Math.random() * 0.12),
-    'E85': 0.85 + (Math.random() * 0.10),
-    'GPLc': 0.95 + (Math.random() * 0.10)
-  };
-  
-  // Ajouter une variation selon l'enseigne
-  const brandFactors = {
-    'leclerc': 0.95, 'carrefour': 0.96, 'auchan': 0.97,
-    'intermarche': 0.98, 'systeme u': 0.97, 'total': 1.02,
-    'esso': 1.01, 'shell': 1.01
-  };
-  
-  let factor = 1.0;
-  for (let [key, val] of Object.entries(brandFactors)) {
-    if (brandName.toLowerCase().includes(key)) factor = val;
-  }
-  
-  const fuels = [];
-  for (let [fuelName, basePrice] of Object.entries(basePrices)) {
-    fuels.push({
-      shortName: fuelName,
-      amount: +(basePrice * factor).toFixed(3),
-      updatedAt: new Date().toISOString(),
-      isDemo: true
-    });
-  }
-  return fuels;
-}
 
 function getBrandLogo(brandName) {
   if (!brandName) return null;
@@ -493,6 +446,43 @@ function gps() {
   );
 }
 
+function extractPrice(fuelObj) {
+  if (!fuelObj) return null;
+  if (fuelObj.Price?.amount) return { amount: +fuelObj.Price.amount, updatedAt: fuelObj.Price.last_update };
+  if (fuelObj.price?.amount) return { amount: +fuelObj.price.amount, updatedAt: fuelObj.price.last_update };
+  if (fuelObj.amount) return { amount: +fuelObj.amount, updatedAt: null };
+  if (fuelObj.value) return { amount: +fuelObj.value, updatedAt: null };
+  return null;
+}
+
+function normalizeFuels(rawFuels) {
+  const byFuel = {};
+  if (!Array.isArray(rawFuels)) return [];
+  
+  rawFuels.forEach(fuel => {
+    const priceData = extractPrice(fuel);
+    if (!priceData || priceData.amount <= 0) return;
+    
+    let shortName = (fuel.shortName || fuel.short_name || fuel.name || '').trim();
+    if (shortName.includes('E10')) shortName = 'E10';
+    else if (shortName.includes('SP95') && !shortName.includes('E10')) shortName = 'SP95';
+    else if (shortName.includes('SP98')) shortName = 'SP98';
+    else if (shortName.includes('Gazole') || shortName.includes('Diesel')) shortName = 'Gazole';
+    else if (shortName.includes('E85')) shortName = 'E85';
+    else if (shortName.includes('GPL')) shortName = 'GPLc';
+    else return;
+    
+    if (!byFuel[shortName] || priceData.amount < byFuel[shortName].amount) {
+      byFuel[shortName] = {
+        shortName: shortName,
+        amount: priceData.amount,
+        updatedAt: priceData.updatedAt
+      };
+    }
+  });
+  return Object.values(byFuel);
+}
+
 async function load() {
   if (isLoading || !userLat) return;
   isLoading = true;
@@ -509,10 +499,7 @@ async function load() {
       throw new Error('Aucune station trouvée');
     }
     
-    showLoading(`Chargement des prix pour ${Math.min(list.length, 20)} stations...`);
     const slice = list.slice(0, 20);
-    
-    // Récupérer les prix pour chaque station
     const pricePromises = slice.map(s => 
       fetch(`https://api.prix-carburants.2aaz.fr/station/${s.id}`)
         .then(r => r.ok ? r.json() : null)
@@ -521,24 +508,20 @@ async function load() {
     const priceDetails = await Promise.all(pricePromises);
     
     stations = [];
-    let hasRealPrices = false;
-    
     for (let i = 0; i < slice.length; i++) {
       const s = slice[i];
       const priceData = priceDetails[i];
       const brandName = s.Brand?.name || s.name || 'Station Service';
       
-      // Essayer d'extraire les prix réels
       let fuels = [];
-      if (priceData && priceData.Fuels && Array.isArray(priceData.Fuels)) {
-        fuels = extractFuelsFromApi(priceData.Fuels);
-        if (fuels.length > 0) hasRealPrices = true;
+      if (priceData && priceData.Fuels) {
+        fuels = normalizeFuels(priceData.Fuels);
+      }
+      if (fuels.length === 0 && s.Fuels) {
+        fuels = normalizeFuels(s.Fuels);
       }
       
-      // Si pas de prix réels, utiliser les données de démonstration
-      if (fuels.length === 0) {
-        fuels = generateDemoPrices(brandName, s.id);
-      }
+      if (fuels.length === 0) continue;
       
       stations.push({
         id: s.id,
@@ -549,60 +532,17 @@ async function load() {
         address: s.Address?.street_line || '',
         city: s.Address?.city_line || '',
         fuels: fuels,
-        dist: haversine(userLat, userLon, s.Coordinates.latitude, s.Coordinates.longitude),
-        isDemo: fuels[0]?.isDemo || false
+        dist: haversine(userLat, userLon, s.Coordinates.latitude, s.Coordinates.longitude)
       });
     }
     
-    // Ajouter un bandeau d'avertissement si ce sont des données de démo
-    if (!hasRealPrices && stations.length > 0) {
-      const warningHtml = `<div class="warning-banner">⚠️ Données de démonstration affichées. L'API ne renvoie pas de prix pour cette zone.</div>`;
-      document.getElementById('result').innerHTML = warningHtml;
-    }
-    
+    if (stations.length === 0) throw new Error('Aucun prix disponible');
     render();
   } catch(e) {
-    console.error('Erreur:', e);
-    showState('⚠️', e.message || 'Erreur de chargement', true);
+    showState('⚠️', e.message, true);
   } finally {
     isLoading = false;
   }
-}
-
-function extractFuelsFromApi(apiFuels) {
-  const fuels = [];
-  if (!Array.isArray(apiFuels)) return fuels;
-  
-  for (let f of apiFuels) {
-    let amount = null;
-    let updatedAt = null;
-    
-    // Extraire le prix de différentes structures possibles
-    if (f.Price?.amount) { amount = f.Price.amount; updatedAt = f.Price.last_update; }
-    else if (f.price?.amount) { amount = f.price.amount; updatedAt = f.price.last_update; }
-    else if (f.amount) { amount = f.amount; }
-    else if (f.value) { amount = f.value; }
-    
-    if (amount && !isNaN(amount) && amount > 0) {
-      let shortName = (f.shortName || f.short_name || f.name || '').trim();
-      // Normaliser le nom
-      if (shortName.includes('E10')) shortName = 'E10';
-      else if (shortName.includes('SP95') && !shortName.includes('E10')) shortName = 'SP95';
-      else if (shortName.includes('SP98')) shortName = 'SP98';
-      else if (shortName.includes('Gazole') || shortName.includes('Diesel')) shortName = 'Gazole';
-      else if (shortName.includes('E85')) shortName = 'E85';
-      else if (shortName.includes('GPL')) shortName = 'GPLc';
-      else continue;
-      
-      fuels.push({
-        shortName: shortName,
-        amount: +amount,
-        updatedAt: updatedAt,
-        isDemo: false
-      });
-    }
-  }
-  return fuels;
 }
 
 function render() {
@@ -612,7 +552,6 @@ function render() {
     return;
   }
   
-  // Calculer les statistiques pour chaque carburant
   const fuelStats = {};
   filtered.forEach(s => {
     s.fuels.forEach(f => {
@@ -623,7 +562,6 @@ function render() {
   });
   Object.keys(fuelStats).forEach(f => fuelStats[f].sort((a,b) => a.amount - b.amount));
   
-  // Trier
   const sorted = [...filtered].sort((a,b) => {
     if (sortMode === 'price' && activeFuel !== 'all') {
       const pa = a.fuels.find(f => f.shortName === activeFuel)?.amount || Infinity;
@@ -639,8 +577,7 @@ function render() {
   </div>`;
   
   sorted.forEach(s => html += buildCard(s, fuelStats));
-  document.getElementById('result').innerHTML = (document.getElementById('result').innerHTML.includes('warning-banner') ? 
-    document.getElementById('result').innerHTML.split('</div>')[0] + '</div>' : '') + html;
+  document.getElementById('result').innerHTML = html;
 }
 
 function buildCard(s, fuelStats) {
@@ -667,10 +604,9 @@ function buildCard(s, fuelStats) {
         </div>
         <div class="price-main">
           <span class="price-amount ${isBest ? 'cheap' : (isWorst ? 'expensive' : '')}">${f.amount.toFixed(3)}€</span>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <div>
             ${isBest ? '<span class="price-badge badge-best">🏆 Meilleur prix</span>' : ''}
             ${isWorst ? '<span class="price-badge badge-worst">⚠️ Plus cher</span>' : ''}
-            ${f.isDemo ? '<span class="price-badge badge-demo">🎮 Donnée démo</span>' : ''}
           </div>
         </div>
         ${total > 1 ? `
@@ -739,7 +675,6 @@ function showState(icon, msg, isError) {
   document.getElementById('result').innerHTML = `<div class="state-card${isError ? ' error' : ''}"><div style="font-size:3rem;margin-bottom:16px">${icon}</div><p>${msg}</p></div>`;
 }
 
-// Lancer la recherche automatique pour Gien
 window.addEventListener('DOMContentLoaded', () => setTimeout(searchCity, 500));
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(console.warn);
 </script>
